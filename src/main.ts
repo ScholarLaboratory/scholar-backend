@@ -38,7 +38,15 @@ async function bootstrap() {
       'Backend API for Project Scholar - AI Powered Learning Platform',
     )
     .setVersion('1.0')
-    .addBearerAuth()
+    .addBearerAuth(
+  {
+    type: 'http',
+    scheme: 'bearer',
+    bearerFormat: 'JWT',
+    description: 'Enter JWT token',
+  },
+  'JWT',
+)
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
