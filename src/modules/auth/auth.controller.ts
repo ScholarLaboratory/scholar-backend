@@ -7,6 +7,7 @@ import {
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
 
 @ApiTags('Authentication')
 @Controller({
@@ -24,5 +25,13 @@ export class AuthController {
   @ApiResponse({ status: 201, description: 'Registration successful' })
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
+  }
+
+  @Post('login')
+  @ApiOperation({ summary: 'Login an existing student' })
+  @ApiBody({ type: LoginDto })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  async login(@Body() dto: LoginDto) {
+    return this.authService.login(dto.email, dto.password);
   }
 }
