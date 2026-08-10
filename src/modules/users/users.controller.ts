@@ -3,12 +3,15 @@ import {
   Get,
   Req,
   UseGuards,
+  Body,
+  Patch,
   NotFoundException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -38,4 +41,28 @@ export class UsersController {
       data: safeUser,
     };
   }
+
+  @Patch('me')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT')
+@ApiOperation({
+  summary: 'Update current student profile',
+})
+async updateProfile(
+  @Req() req: any,
+  @Body() dto: UpdateProfileDto,
+) {
+  const user = await this.usersService.updateProfile(
+    req.user.id,
+    dto,
+  );
+
+  const { password, ...safeUser } = user;
+
+  return {
+    success: true,
+    message: 'Profile updated successfully',
+    data: safeUser,
+  };
+}
 }
