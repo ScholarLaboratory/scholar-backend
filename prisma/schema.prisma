@@ -19,6 +19,25 @@ model User {
   school    String?
   level     String?
 
+  following Follow[] @relation("UserFollowing")
+  followers Follow[] @relation("UserFollowers")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+
+  followerId  String
+  followingId String
+
+  follower    User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
 }

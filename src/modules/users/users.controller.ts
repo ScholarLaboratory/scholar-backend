@@ -5,6 +5,9 @@ import {
   UseGuards,
   Body,
   Patch,
+  Param,
+  Post,
+  Delete,
   NotFoundException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -65,4 +68,43 @@ async updateProfile(
     data: safeUser,
   };
 }
+
+@Post(':id/follow')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT')
+@ApiOperation({
+  summary: 'Follow a student',
+})
+async followUser(
+  @Req() req: any,
+  @Param('id') userId: string,
+) {
+  const follow = await this.usersService.follow(
+    req.user.id,
+    userId,
+  );
+
+  return {
+    success: true,
+    message: 'User followed successfully',
+    data: follow,
+  };
+}
+
+@Delete(':id/follow')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT')
+@ApiOperation({
+  summary: 'Unfollow a student',
+})
+async unfollowUser(
+  @Req() req: any,
+  @Param('id') userId: string,
+) {
+  return this.usersService.unfollow(
+    req.user.id,
+    userId,
+  );
+}
+
 }
