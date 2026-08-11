@@ -4,20 +4,18 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  
 }
 
-
 model User {
-  id        String   @id @default(uuid())
-  fullName  String
-  username  String   @unique
-  email     String   @unique
-  password  String
+  id       String @id @default(uuid())
+  fullName String
+  username String @unique
+  email    String @unique
+  password String
 
-  bio       String?
-  school    String?
-  level     String?
+  bio    String?
+  school String?
+  level  String?
 
   following Follow[] @relation("UserFollowing")
   followers Follow[] @relation("UserFollowers")
@@ -27,17 +25,122 @@ model User {
 }
 
 model Follow {
-  id          String   @id @default(uuid())
+  id String @id @default(uuid())
 
   followerId  String
   followingId String
 
-  follower    User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
-  following   User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+  follower  User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([followerId, followingId])
   @@index([followerId])
   @@index([followingId])
+}
+
+model Question {
+  id           String @id @default(uuid())
+  questionText String
+
+  academicLevel AcademicLevel
+  difficulty    Difficulty
+  questionType  QuestionType   @default(MULTIPLE_CHOICE)
+  source        QuestionSource
+  status        QuestionStatus @default(DRAFT)
+
+  explanation String?
+
+  subjectId String
+  topicId   String
+
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  topic Topic @relation(fields: [topicId], references: [id])
+
+  options QuestionOption[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([subjectId])
+  @@index([topicId])
+  @@index([academicLevel])
+  @@index([difficulty])
+  @@index([status])
+}
+
+model QuestionOption {
+  id String @id @default(uuid())
+
+  questionId String
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  optionText String
+  isCorrect  Boolean
+
+  createdAt DateTime @default(now())
+
+  @@index([questionId])
+}
+
+enum AcademicLevel {
+  PRIMARY
+  SECONDARY
+  UNIVERSITY
+  PROFESSIONAL
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+}
+
+enum QuestionSource {
+  PLATFORM
+  AI
+  EXTERNAL
+}
+
+enum QuestionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Subject {
+  id   String @id @default(uuid())
+  name String @unique
+  slug String @unique
+
+  topics    Topic[]
+  questions Question[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Topic {
+  id   String @id @default(uuid())
+  name String
+  slug String
+
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  questions Question[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([subjectId, slug])
+  @@index([subjectId])
 }

@@ -107,4 +107,38 @@ async unfollowUser(
   );
 }
 
+@Get(':id/followers')
+@ApiOperation({
+  summary: 'Get a student followers',
+})
+async getFollowers(
+  @Param('id') userId: string,
+) {
+  const followers =
+    await this.usersService.getFollowers(userId);
+
+  return {
+    success: true,
+    message: 'Followers retrieved successfully',
+    data: followers,
+  };
+}
+
+@Get(':id/following')
+@ApiOperation({
+  summary: 'Get students this user follows',
+})
+async getFollowing(
+  @Param('id') userId: string,
+) {
+  const following =
+    await this.usersService.getFollowing(userId);
+
+  return {
+    success: true,
+    message: 'Following retrieved successfully',
+    data: following,
+  };
+}
+
 }

@@ -154,4 +154,69 @@ async unfollow(
     message: 'User unfollowed successfully',
   };
 }
+async getFollowers(userId: string) {
+  const user = await this.prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+
+  const followers = await this.prisma.follow.findMany({
+    where: {
+      followingId: userId,
+    },
+    include: {
+      follower: {
+        select: {
+          id: true,
+          fullName: true,
+          username: true,
+          bio: true,
+          school: true,
+          level: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  return followers.map((follow) => follow.follower);
+}
+
+async getFollowing(userId: string) {
+  const user = await this.prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+
+  const following = await this.prisma.follow.findMany({
+    where: {
+      followerId: userId,
+    },
+    include: {
+      following: {
+        select: {
+          id: true,
+          fullName: true,
+          username: true,
+          bio: true,
+          school: true,
+          level: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  return following.map((follow) => follow.following);
+}
 }
