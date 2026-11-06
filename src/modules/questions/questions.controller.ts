@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { QuestionsService } from './questions.service';
@@ -14,9 +14,9 @@ export class QuestionsController {
   @Post('subjects')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT')
-  @ApiOperation({ summary: 'Create a subject (authenticated MVP author)' })
-  createSubject(@Body() dto: CreateSubjectDto) {
-    return this.questionsService.createSubject(dto);
+  @ApiOperation({ summary: 'Create a subject (facilitator or admin)' })
+  createSubject(@Req() req: { user: { id: string } }, @Body() dto: CreateSubjectDto) {
+    return this.questionsService.createSubject(req.user.id, dto);
   }
 
   @Get('subjects')
@@ -28,8 +28,8 @@ export class QuestionsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT')
   @ApiOperation({ summary: 'Create a topic under a subject' })
-  createTopic(@Body() dto: CreateTopicDto) {
-    return this.questionsService.createTopic(dto);
+  createTopic(@Req() req: { user: { id: string } }, @Body() dto: CreateTopicDto) {
+    return this.questionsService.createTopic(req.user.id, dto);
   }
 
   @Get('subjects/:subjectId/topics')
@@ -41,8 +41,8 @@ export class QuestionsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT')
   @ApiOperation({ summary: 'Create a multiple-choice question with answer options' })
-  createQuestion(@Body() dto: CreateQuestionDto) {
-    return this.questionsService.createQuestion(dto);
+  createQuestion(@Req() req: { user: { id: string } }, @Body() dto: CreateQuestionDto) {
+    return this.questionsService.createQuestion(req.user.id, dto);
   }
 
   @Get('topics/:topicId/questions')
