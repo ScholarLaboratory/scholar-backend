@@ -108,6 +108,17 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       where: { id: competitionId },
       data: { endsAt: new Date(Date.now() - 1000) },
     });
+    // Race a finalization attempt against expiry settlement and verify immutable results.
+    const submitAfterDeadline = request(app.getHttpServer())
+      .post(`/api/v1/quizzes/${quizIds[0]}/complete`)
+      .auth(host.token, { type: 'bearer' });
+    const settle = request(app.getHttpServer())
+      .get(`/api/v1/competitions/${competitionId}/leaderboard`)
+      .auth(host.token, { type: 'bearer' });
+    const [lateCompletion, settledBoard] = await Promise.all([submitAfterDeadline, settle]);
+    expect(lateCompletion.status).toBe(409);
+    expect(settledBoard.status).toBe(200);
+
     const board = await request(app.getHttpServer())
       .get(`/api/v1/competitions/${competitionId}/leaderboard`)
       .auth(host.token, { type: 'bearer' }).expect(200);
