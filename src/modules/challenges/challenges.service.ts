@@ -29,8 +29,8 @@ export class ChallengesService {
       throw new BadRequestException('Not enough published questions for this challenge.');
     }
     return this.prisma.challenge.create({
-      data: { challengerId, opponentId: dto.opponentId, topicId: dto.topicId, questionCount },
-      select: { id: true, challengerId: true, opponentId: true, topicId: true, questionCount: true, status: true },
+      data: { challengerId, opponentId: dto.opponentId, topicId: dto.topicId, questionCount, durationSeconds: dto.durationSeconds ?? 300 },
+      select: { id: true, challengerId: true, opponentId: true, topicId: true, questionCount: true, durationSeconds: true, status: true },
     });
   }
 
@@ -43,6 +43,9 @@ export class ChallengesService {
         opponentId: true,
         topicId: true,
         questionCount: true,
+        durationSeconds: true,
+        startsAt: true,
+        endsAt: true,
         status: true,
         createdAt: true,
         acceptedAt: true,
@@ -123,6 +126,43 @@ export class ChallengesService {
     });
   }
 
+  async ready(userId: string, challengeId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const challenge = await tx.challenge.findUnique({ where: { id: challengeId } });
+      if (!challenge) throw new NotFoundException('Challenge not found.');
+      if (challenge.challengerId !== userId && challenge.opponentId !== userId) {
+        throw new ForbiddenException('Not a challenge participant.');
+      }
+      if (challenge.status !== ChallengeStatus.ACTIVE || !challenge.challengerQuizId || !challenge.opponentQuizId) {
+        throw new ConflictException('Challenge must be accepted before players can get ready.');
+      }
+      if (challenge.startsAt && challenge.endsAt) {
+        return { startsAt: challenge.startsAt, endsAt: challenge.endsAt, status: 'STARTED' };
+      }
+      const isChallenger = challenge.challengerId === userId;
+      const field = isChallenger ? 'challengerReadyAt' : 'opponentReadyAt';
+      if (!challenge[field]) {
+        await tx.challenge.update({ where: { id: challengeId }, data: { [field]: new Date() } });
+      }
+      const latest = await tx.challenge.findUniqueOrThrow({ where: { id: challengeId } });
+      if (latest.challengerReadyAt && latest.opponentReadyAt && !latest.startsAt) {
+        const startsAt = new Date();
+        const endsAt = new Date(startsAt.getTime() + latest.durationSeconds * 1000);
+        const updated = await tx.challenge.updateMany({
+          where: { id: challengeId, startsAt: null, status: ChallengeStatus.ACTIVE },
+          data: { startsAt, endsAt },
+        });
+        if (updated.count === 1) return { startsAt, endsAt, status: 'STARTED' };
+      }
+      const current = await tx.challenge.findUniqueOrThrow({ where: { id: challengeId } });
+      return {
+        status: current.startsAt ? 'STARTED' : 'WAITING_FOR_OPPONENT',
+        startsAt: current.startsAt,
+        endsAt: current.endsAt,
+      };
+    });
+  }
+
   async get(userId: string, challengeId: string) {
     const challenge = await this.prisma.challenge.findUnique({
       where: { id: challengeId },
@@ -145,6 +185,9 @@ export class ChallengesService {
       opponentId: challenge.opponentId,
       topicId: challenge.topicId,
       questionCount: challenge.questionCount,
+      durationSeconds: challenge.durationSeconds,
+      startsAt: challenge.startsAt,
+      endsAt: challenge.endsAt,
       myQuizId: challenge.challengerId === userId ? challenge.challengerQuizId : challenge.opponentQuizId,
       ...(bothDone ? {
         challengerScore: challenge.challengerQuiz?.score,
