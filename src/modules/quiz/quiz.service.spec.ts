@@ -9,8 +9,9 @@ describe('QuizService', () => {
   beforeEach(() => {
     prisma = {
       topic: { findUnique: jest.fn() },
+      user: { findMany: jest.fn() },
       question: { findMany: jest.fn() },
-      quizSession: { create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn() },
+      quizSession: { create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
       quizSessionQuestion: { findUnique: jest.fn() },
       questionOption: { findFirst: jest.fn() },
       quizAnswer: { create: jest.fn(), findMany: jest.fn() },
@@ -66,6 +67,25 @@ describe('QuizService', () => {
     await expect(service.submitAnswer('user', 'session', {
       questionId: 'question', selectedOptionId: 'wrong-option',
     })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('ranks users by completed quiz XP without exposing private profile fields', async () => {
+    prisma.quizSession.groupBy.mockResolvedValue([
+      { userId: 'u1', _sum: { xpEarned: 30, score: 3 }, _count: { id: 2 } },
+    ]);
+    prisma.user.findMany.mockResolvedValue([
+      { id: 'u1', username: 'learner', fullName: 'Test Learner', school: null },
+    ]);
+    await expect(service.leaderboard()).resolves.toEqual([{
+      rank: 1,
+      user: { id: 'u1', username: 'learner', fullName: 'Test Learner', school: null },
+      totalXp: 30,
+      correctAnswers: 3,
+      completedQuizzes: 2,
+    }]);
+    expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      select: { id: true, username: true, fullName: true, school: true },
+    }));
   });
 
   it('scores completed quizzes and awards XP once', async () => {
