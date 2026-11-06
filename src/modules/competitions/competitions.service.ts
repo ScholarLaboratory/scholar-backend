@@ -139,7 +139,7 @@ export class CompetitionsService {
         include: { participants: { select: { quizSessionId: true } } },
       });
       if (!event?.endsAt || event.endsAt.getTime() > Date.now()) return;
-      for (const participant of event.participants) {
+      for (const participant of [...event.participants].sort((a, b) => (a.quizSessionId ?? '').localeCompare(b.quizSessionId ?? ''))) {
         if (!participant.quizSessionId) continue;
         // Use the same row lock as answer submission and manual completion.
         await tx.$queryRaw`SELECT id FROM "QuizSession" WHERE id = ${participant.quizSessionId}::uuid FOR UPDATE`;
