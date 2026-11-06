@@ -59,6 +59,31 @@ describe('QuizService', () => {
       .rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('blocks answers before both students are ready', async () => {
+    prisma.quizSession.findUnique.mockResolvedValue({
+      userId: 'user', status: 'IN_PROGRESS',
+    });
+    prisma.challenge.findFirst.mockResolvedValue({
+      startsAt: null, endsAt: null,
+    });
+    await expect(service.submitAnswer('user', 'session', {
+      questionId: 'question', selectedOptionId: 'option',
+    })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('blocks answers after the shared deadline', async () => {
+    prisma.quizSession.findUnique.mockResolvedValue({
+      userId: 'user', status: 'IN_PROGRESS',
+    });
+    prisma.challenge.findFirst.mockResolvedValue({
+      startsAt: new Date(Date.now() - 120000),
+      endsAt: new Date(Date.now() - 60000),
+    });
+    await expect(service.submitAnswer('user', 'session', {
+      questionId: 'question', selectedOptionId: 'option',
+    })).rejects.toBeInstanceOf(ConflictException);
+  });
+
   it('rejects options that belong to another question', async () => {
     prisma.quizSession.findUnique.mockResolvedValue({
       userId: 'user', status: 'IN_PROGRESS',
