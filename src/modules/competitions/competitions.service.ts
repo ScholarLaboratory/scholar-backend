@@ -58,6 +58,8 @@ export class CompetitionsService {
 
   async join(userId: string, id: string) {
     return this.prisma.$transaction(async (tx) => {
+      // Serialize registration with closing and starting this competition.
+      await tx.$queryRaw`SELECT id FROM "Competition" WHERE id = ${id}::text FOR UPDATE`;
       const competition = await tx.competition.findUnique({ where: { id }, select: { status: true } });
       if (!competition) throw new NotFoundException('Competition not found.');
       if (competition.status !== 'OPEN') throw new ConflictException('Registration is closed.');
@@ -214,7 +216,10 @@ export class CompetitionsService {
     const competition = await this.prisma.competition.findUnique({ where: { id }, select: { facilitatorId: true } });
     if (!competition) throw new NotFoundException('Competition not found.');
     if (competition.facilitatorId !== userId) throw new ForbiddenException('Only the facilitator can close registration.');
-    const updated = await this.prisma.competition.updateMany({ where: { id, status: 'OPEN' }, data: { status: 'CLOSED' } });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Competition" WHERE id = ${id}::text FOR UPDATE`;
+      return tx.competition.updateMany({ where: { id, status: 'OPEN' }, data: { status: 'CLOSED' } });
+    });
     if (updated.count !== 1) throw new ConflictException('Competition registration is not open.');
     return { id, status: 'CLOSED' };
   }
