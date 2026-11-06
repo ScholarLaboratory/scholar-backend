@@ -98,11 +98,15 @@ describe('Competition flow (PostgreSQL e2e)', () => {
     const competitionId = created.body.id as string;
 
     await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/open`)
+      .auth(student.token, { type: 'bearer' }).expect(403);
+    await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/open`)
       .auth(host.token, { type: 'bearer' }).expect(201);
     for (const user of [host, student]) {
       await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/join`)
         .auth(user.token, { type: 'bearer' }).expect(201);
     }
+    await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/close`)
+      .auth(student.token, { type: 'bearer' }).expect(403);
     const lateStudent = await register(3);
     const [lateJoin, closed] = await Promise.all([
       request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/join`)
@@ -118,6 +122,8 @@ describe('Competition flow (PostgreSQL e2e)', () => {
     expect(roster.some((entry) => entry.userId === lateStudent.id)).toBe(lateJoin.status === 201);
     await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/join`)
       .auth(lateStudent.token, { type: 'bearer' }).expect(409);
+    await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/start`)
+      .auth(student.token, { type: 'bearer' }).expect(403);
     const started = await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/start`)
       .auth(host.token, { type: 'bearer' }).expect(201);
     expect(new Date(started.body.endsAt).getTime() - new Date(started.body.startsAt).getTime())
