@@ -14,6 +14,7 @@ describe('ChallengesService', () => {
       challenge: { create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), updateMany: jest.fn() },
       quizAnswer: { findMany: jest.fn() },
       quizSession: { updateMany: jest.fn(), findUniqueOrThrow: jest.fn() },
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn(async (fn: (tx: any) => Promise<any>) => fn(prisma)),
     };
     service = new ChallengesService(prisma as PrismaService);
