@@ -34,6 +34,46 @@ export class ChallengesService {
     });
   }
 
+  async myChallenges(userId: string) {
+    const challenges = await this.prisma.challenge.findMany({
+      where: { OR: [{ challengerId: userId }, { opponentId: userId }] },
+      select: {
+        id: true,
+        challengerId: true,
+        opponentId: true,
+        topicId: true,
+        questionCount: true,
+        status: true,
+        createdAt: true,
+        acceptedAt: true,
+        completedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    return challenges;
+  }
+
+  async decline(userId: string, challengeId: string) {
+    const challenge = await this.prisma.challenge.findUnique({
+      where: { id: challengeId },
+      select: { opponentId: true, status: true },
+    });
+    if (!challenge) throw new NotFoundException('Challenge not found.');
+    if (challenge.opponentId !== userId) {
+      throw new ForbiddenException('Only the invited opponent can decline.');
+    }
+    if (challenge.status !== ChallengeStatus.PENDING) {
+      throw new ConflictException('Challenge is no longer pending.');
+    }
+    const updated = await this.prisma.challenge.updateMany({
+      where: { id: challengeId, status: ChallengeStatus.PENDING },
+      data: { status: ChallengeStatus.DECLINED },
+    });
+    if (updated.count !== 1) throw new ConflictException('Challenge is no longer pending.');
+    return { id: challengeId, status: ChallengeStatus.DECLINED };
+  }
+
   async accept(userId: string, challengeId: string) {
     return this.prisma.$transaction(async (tx) => {
       const challenge = await tx.challenge.findUnique({ where: { id: challengeId } });
