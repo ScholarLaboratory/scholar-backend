@@ -135,6 +135,13 @@ describe('Competition flow (PostgreSQL e2e)', () => {
     expect(new Date(started.body.endsAt).getTime() - new Date(started.body.startsAt).getTime())
       .toBeGreaterThanOrEqual(29000);
 
+    const activeBoard = await request(app.getHttpServer())
+      .get(`/api/v1/competitions/${competitionId}/leaderboard`)
+      .auth(student.token, { type: 'bearer' }).expect(200);
+    expect(activeBoard.body).toMatchObject({
+      competitionId, status: 'IN_PROGRESS', rankings: [],
+    });
+
     const quizIds: string[] = [];
     const questionSets: string[][] = [];
     for (const user of [host, student]) {
