@@ -18,6 +18,12 @@ export class QuizController {
     return this.quizService.start(req.user.id, dto);
   }
 
+  @Get('leaderboard')
+  @ApiOperation({ summary: 'Top students by earned quiz XP' })
+  leaderboard() {
+    return this.quizService.leaderboard();
+  }
+
   @Get('results/me')
   @ApiOperation({ summary: 'List my completed quiz results' })
   myResults(@Req() req: { user: { id: string } }) {
