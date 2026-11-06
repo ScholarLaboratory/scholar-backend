@@ -329,4 +329,46 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       expect(session.score).toBe(0);
     }
   });
+  it('completes a standalone quiz and awards XP exactly once', async () => {
+    const player = await register(4);
+    const started = await request(app.getHttpServer())
+      .post('/api/v1/quizzes')
+      .auth(player.token, { type: 'bearer' })
+      .send({ topicId, questionCount: 2 }).expect(201);
+    const sessionId = started.body.id as string;
+    expect(started.body.questions).toHaveLength(2);
+    for (const question of started.body.questions as { id: string }[]) {
+      const correct = await prisma.questionOption.findFirstOrThrow({
+        where: { questionId: question.id, isCorrect: true },
+        select: { id: true },
+      });
+      await request(app.getHttpServer())
+        .post(`/api/v1/quizzes/${sessionId}/answers`)
+        .auth(player.token, { type: 'bearer' })
+        .send({ questionId: question.id, selectedOptionId: correct.id })
+        .expect(201);
+    }
+    const completed = await request(app.getHttpServer())
+      .post(`/api/v1/quizzes/${sessionId}/complete`)
+      .auth(player.token, { type: 'bearer' }).expect(201);
+    expect(completed.body).toMatchObject({
+      sessionId, score: 2, total: 2, percentage: 100, xpEarned: 20,
+    });
+    await request(app.getHttpServer())
+      .post(`/api/v1/quizzes/${sessionId}/complete`)
+      .auth(player.token, { type: 'bearer' }).expect(409);
+    const persisted = await prisma.quizSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+    expect(persisted).toMatchObject({
+      status: 'COMPLETED', score: 2, xpEarned: 20,
+    });
+    const results = await request(app.getHttpServer())
+      .get('/api/v1/quizzes/results/me')
+      .auth(player.token, { type: 'bearer' }).expect(200);
+    expect(results.body).toContainEqual(expect.objectContaining({
+      id: sessionId, score: 2, xpEarned: 20,
+    }));
+  });
+
 });
