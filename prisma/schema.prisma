@@ -178,6 +178,7 @@ model QuizSession {
   answers   QuizAnswer[]
   challengeParticipants Challenge[] @relation("ChallengerQuiz")
   opponentChallengeParticipants Challenge[] @relation("OpponentQuiz")
+  competitionParticipant CompetitionParticipant?
 
   @@index([userId, startedAt])
 }
@@ -261,6 +262,8 @@ model Competition {
   durationSeconds Int @default(300)
   status CompetitionStatus @default(DRAFT)
   scheduledAt DateTime?
+  startsAt DateTime?
+  endsAt DateTime?
   createdAt DateTime @default(now())
   facilitator User @relation("CompetitionHost", fields: [facilitatorId], references: [id], onDelete: Cascade)
   topic Topic @relation(fields: [topicId], references: [id], onDelete: Restrict)
@@ -272,6 +275,8 @@ model CompetitionParticipant {
   competitionId String
   userId String
   joinedAt DateTime @default(now())
+  quizSessionId String? @unique
+  quizSession QuizSession? @relation(fields: [quizSessionId], references: [id], onDelete: SetNull)
   competition Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@id([competitionId, userId])
