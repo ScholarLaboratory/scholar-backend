@@ -70,6 +70,26 @@ describe('Competition flow (PostgreSQL e2e)', () => {
   it('registers students, starts synchronized quizzes and publishes results after expiry', async () => {
     const host = await register(1);
     const student = await register(2);
+    // A freshly registered student cannot create hosted events or edit the question bank.
+    await request(app.getHttpServer()).post('/api/v1/competitions')
+      .auth(student.token, { type: 'bearer' })
+      .send({ title: 'Unauthorized Cup', topicId, questionCount: 2, durationSeconds: 30 })
+      .expect(403);
+    await request(app.getHttpServer()).post('/api/v1/subjects')
+      .auth(student.token, { type: 'bearer' })
+      .send({ name: 'Unauthorized Subject ' + tag })
+      .expect(403);
+    await request(app.getHttpServer()).post('/api/v1/topics')
+      .auth(student.token, { type: 'bearer' })
+      .send({ subjectId, name: 'Unauthorized Topic' })
+      .expect(403);
+    await request(app.getHttpServer()).post('/api/v1/questions')
+      .auth(student.token, { type: 'bearer' })
+      .send({
+        subjectId, topicId, questionText: 'Unauthorized question?',
+        academicLevel: 'SECONDARY', difficulty: 'BEGINNER',
+        options: [{ optionText: 'A', isCorrect: true }, { optionText: 'B', isCorrect: false }],
+      }).expect(403);
     await prisma.user.update({ where: { id: host.id }, data: { role: 'FACILITATOR' } });
     const created = await request(app.getHttpServer()).post('/api/v1/competitions')
       .auth(host.token, { type: 'bearer' })
