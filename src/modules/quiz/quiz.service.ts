@@ -95,7 +95,9 @@ export class QuizService {
     });
     if (!session) throw new NotFoundException('Quiz session not found.');
     if (session.userId !== userId) throw new ForbiddenException('Not your quiz session.');
-    await this.assertChallengeWindow(this.prisma, sessionId);
+    if (session.status === QuizSessionStatus.IN_PROGRESS) {
+      await this.assertChallengeWindow(this.prisma, sessionId);
+    }
     return {
       id: session.id,
       status: session.status,
