@@ -11,6 +11,7 @@ describe('QuizService', () => {
       topic: { findUnique: jest.fn() },
       user: { findMany: jest.fn() },
       challenge: { findFirst: jest.fn().mockResolvedValue(null), updateMany: jest.fn() },
+      competitionParticipant: { findUnique: jest.fn().mockResolvedValue(null) },
       question: { findMany: jest.fn() },
       quizSession: { create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
       quizSessionQuestion: { findUnique: jest.fn() },
