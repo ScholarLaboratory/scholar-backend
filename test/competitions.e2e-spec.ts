@@ -62,7 +62,7 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       .expect(201);
     ids.push(registration.body.data.id);
     const login = await request(app.getHttpServer())
-      .post('/api/v1/auth/login').send({ email, password }).expect(200);
+      .post('/api/v1/auth/login').send({ email, password }).expect(201);
     return { id: registration.body.data.id, token: login.body.data.accessToken as string };
   }
 
