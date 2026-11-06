@@ -74,6 +74,8 @@ export class CompetitionsService {
 
   async start(userId: string, id: string) {
     return this.prisma.$transaction(async (tx) => {
+      // Lock the event before reading its roster; join/close use the same lock.
+      await tx.$queryRaw`SELECT id FROM "Competition" WHERE id = ${id}::text FOR UPDATE`;
       const competition = await tx.competition.findUnique({
         where: { id },
         include: { participants: { select: { userId: true, quizSessionId: true } } },
