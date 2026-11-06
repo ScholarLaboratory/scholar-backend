@@ -90,6 +90,15 @@ describe('Competition flow (PostgreSQL e2e)', () => {
         academicLevel: 'SECONDARY', difficulty: 'BEGINNER',
         options: [{ optionText: 'A', isCorrect: true }, { optionText: 'B', isCorrect: false }],
       }).expect(403);
+    const publishedQuestions = await request(app.getHttpServer())
+      .get(`/api/v1/topics/${topicId}/questions`).expect(200);
+    expect(publishedQuestions.body).toHaveLength(2);
+    for (const question of publishedQuestions.body) {
+      expect(question).not.toHaveProperty('explanation');
+      for (const option of question.options) {
+        expect(option).not.toHaveProperty('isCorrect');
+      }
+    }
     await prisma.user.update({ where: { id: host.id }, data: { role: 'FACILITATOR' } });
     const created = await request(app.getHttpServer()).post('/api/v1/competitions')
       .auth(host.token, { type: 'bearer' })
