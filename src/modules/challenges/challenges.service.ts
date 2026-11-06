@@ -163,7 +163,59 @@ export class ChallengesService {
     });
   }
 
+  // Settle timed-out challenges when their status is requested.
+  // A scheduled worker can call this method later for proactive settlement.
+  async settleExpired(challengeId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const challenge = await tx.challenge.findUnique({
+        where: { id: challengeId },
+        include: {
+          challengerQuiz: { select: { id: true, status: true, score: true } },
+          opponentQuiz: { select: { id: true, status: true, score: true } },
+        },
+      });
+      if (!challenge || challenge.status !== ChallengeStatus.ACTIVE ||
+          !challenge.endsAt || challenge.endsAt.getTime() > Date.now() ||
+          !challenge.challengerQuiz || !challenge.opponentQuiz) return;
+
+      for (const quiz of [challenge.challengerQuiz, challenge.opponentQuiz]) {
+        if (quiz.status === 'COMPLETED') continue;
+        const answers = await tx.quizAnswer.findMany({
+          where: { sessionId: quiz.id },
+          select: { isCorrect: true },
+        });
+        const score = answers.filter((answer) => answer.isCorrect).length;
+        await tx.quizSession.updateMany({
+          where: { id: quiz.id, status: 'IN_PROGRESS' },
+          data: {
+            status: 'COMPLETED',
+            score,
+            xpEarned: score * 10,
+            completedAt: challenge.endsAt,
+          },
+        });
+      }
+
+      const [challenger, opponent] = await Promise.all([
+        tx.quizSession.findUniqueOrThrow({
+          where: { id: challenge.challengerQuiz.id }, select: { score: true },
+        }),
+        tx.quizSession.findUniqueOrThrow({
+          where: { id: challenge.opponentQuiz.id }, select: { score: true },
+        }),
+      ]);
+      const winnerId = challenger.score === opponent.score ? null :
+        challenger.score > opponent.score ? challenge.challengerId : challenge.opponentId;
+      await tx.challenge.updateMany({
+        where: { id: challengeId, status: ChallengeStatus.ACTIVE },
+        data: { status: ChallengeStatus.COMPLETED, winnerId, completedAt: new Date() },
+      });
+    });
+  }
+
   async get(userId: string, challengeId: string) {
+    // Authorization is checked below; settling uses only the challenge ID.
+    await this.settleExpired(challengeId);
     const challenge = await this.prisma.challenge.findUnique({
       where: { id: challengeId },
       include: {
