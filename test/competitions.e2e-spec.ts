@@ -155,6 +155,25 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       questionSets.push(quiz.body.questions.map((question: { id: string }) => question.id));
     }
     expect(questionSets[0]).toEqual(questionSets[1]);
+    // Quiz IDs are opaque, but ownership must still be enforced on every route.
+    await request(app.getHttpServer())
+      .get(`/api/v1/quizzes/${quizIds[0]}`)
+      .auth(student.token, { type: 'bearer' }).expect(403);
+    await request(app.getHttpServer())
+      .post(`/api/v1/quizzes/${quizIds[0]}/complete`)
+      .auth(student.token, { type: 'bearer' }).expect(403);
+    const privateQuestion = await prisma.quizSessionQuestion.findFirstOrThrow({
+      where: { sessionId: quizIds[0] }, select: { questionId: true },
+    });
+    const privateOption = await prisma.questionOption.findFirstOrThrow({
+      where: { questionId: privateQuestion.questionId }, select: { id: true },
+    });
+    await request(app.getHttpServer())
+      .post(`/api/v1/quizzes/${quizIds[0]}/answers`)
+      .auth(student.token, { type: 'bearer' })
+      .send({ questionId: privateQuestion.questionId, selectedOptionId: privateOption.id })
+      .expect(403);
+
 
     await prisma.competition.update({
       where: { id: competitionId },
