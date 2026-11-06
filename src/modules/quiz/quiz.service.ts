@@ -168,12 +168,46 @@ export class QuizService {
         },
       });
       if (updated.count !== 1) throw new ConflictException('Quiz already completed.');
+
+      // When this quiz belongs to a 1v1 challenge, settle the challenge
+      // atomically once the other player's quiz is also complete.
+      const challenge = await tx.challenge.findFirst({
+        where: {
+          status: 'ACTIVE',
+          OR: [{ challengerQuizId: sessionId }, { opponentQuizId: sessionId }],
+        },
+        include: {
+          challengerQuiz: { select: { status: true, score: true } },
+          opponentQuiz: { select: { status: true, score: true } },
+        },
+      });
+      let challengeResult: { challengeId: string; winnerId: string | null } | null = null;
+      if (
+        challenge &&
+        challenge.challengerQuiz?.status === QuizSessionStatus.COMPLETED &&
+        challenge.opponentQuiz?.status === QuizSessionStatus.COMPLETED
+      ) {
+        const winnerId =
+          challenge.challengerQuiz.score === challenge.opponentQuiz.score
+            ? null
+            : challenge.challengerQuiz.score > challenge.opponentQuiz.score
+              ? challenge.challengerId
+              : challenge.opponentId;
+        const settled = await tx.challenge.updateMany({
+          where: { id: challenge.id, status: 'ACTIVE' },
+          data: { status: 'COMPLETED', winnerId, completedAt: new Date() },
+        });
+        if (settled.count === 1) {
+          challengeResult = { challengeId: challenge.id, winnerId };
+        }
+      }
       return {
         sessionId,
         score,
         total: session.total,
         percentage: Math.round((score / session.total) * 100),
         xpEarned,
+        ...(challengeResult ? { challengeResult } : {}),
       };
     });
   }
