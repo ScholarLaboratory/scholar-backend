@@ -17,6 +17,8 @@ model User {
   school String?
   level  String?
 
+  hostedCompetitions Competition[] @relation("CompetitionHost")
+  competitionEntries CompetitionParticipant[]
   quizSessions QuizSession[]
   sentChallenges Challenge[] @relation("ChallengeChallenger")
   receivedChallenges Challenge[] @relation("ChallengeOpponent")
@@ -147,6 +149,7 @@ model Topic {
 
   questions Question[]
   challenges Challenge[]
+  competitions Competition[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -241,4 +244,35 @@ model Challenge {
 
   @@index([challengerId, createdAt])
   @@index([opponentId, status])
+}
+
+enum CompetitionStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+model Competition {
+  id String @id @default(uuid())
+  title String
+  facilitatorId String
+  topicId String
+  questionCount Int @default(10)
+  durationSeconds Int @default(300)
+  status CompetitionStatus @default(DRAFT)
+  scheduledAt DateTime?
+  createdAt DateTime @default(now())
+  facilitator User @relation("CompetitionHost", fields: [facilitatorId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Restrict)
+  participants CompetitionParticipant[]
+  @@index([facilitatorId, createdAt])
+}
+
+model CompetitionParticipant {
+  competitionId String
+  userId String
+  joinedAt DateTime @default(now())
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([competitionId, userId])
 }
