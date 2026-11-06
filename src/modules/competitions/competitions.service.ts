@@ -127,6 +127,70 @@ export class CompetitionsService {
     });
   }
 
+
+  async settleExpired(id: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const event = await tx.competition.findUnique({
+        where: { id },
+        include: { participants: { select: { quizSessionId: true } } },
+      });
+      if (!event?.endsAt || event.endsAt.getTime() > Date.now()) return;
+      for (const participant of event.participants) {
+        if (!participant.quizSessionId) continue;
+        const session = await tx.quizSession.findUnique({
+          where: { id: participant.quizSessionId },
+          select: { status: true },
+        });
+        if (!session || session.status === 'COMPLETED') continue;
+        const answers = await tx.quizAnswer.findMany({
+          where: { sessionId: participant.quizSessionId },
+          select: { isCorrect: true },
+        });
+        const score = answers.filter((answer) => answer.isCorrect).length;
+        await tx.quizSession.updateMany({
+          where: { id: participant.quizSessionId, status: 'IN_PROGRESS' },
+          data: { status: 'COMPLETED', score, xpEarned: score * 10, completedAt: event.endsAt },
+        });
+      }
+    });
+  }
+
+  async leaderboard(userId: string, id: string) {
+    const access = await this.prisma.competition.findUnique({
+      where: { id }, select: { status: true, facilitatorId: true },
+    });
+    if (!access) throw new NotFoundException('Competition not found.');
+    if (access.status === 'DRAFT' && access.facilitatorId !== userId) {
+      throw new ForbiddenException('Competition is not open yet.');
+    }
+    await this.settleExpired(id);
+    const event = await this.prisma.competition.findUniqueOrThrow({
+      where: { id },
+      include: { participants: { select: {
+        user: { select: { id: true, username: true, fullName: true } },
+        quizSession: { select: { status: true, score: true, total: true, completedAt: true } },
+      } } },
+    });
+    const expired = !!event.endsAt && event.endsAt.getTime() <= Date.now();
+    const allDone = !!event.startsAt && event.participants.length > 0 &&
+      event.participants.every((entry) => entry.quizSession?.status === 'COMPLETED');
+    if (!expired && !allDone) {
+      return { competitionId: id, status: event.startsAt ? 'IN_PROGRESS' : 'NOT_STARTED', rankings: [] };
+    }
+    const ranked = event.participants.map((entry) => ({
+      user: entry.user, score: entry.quizSession?.score ?? 0,
+      total: entry.quizSession?.total ?? event.questionCount,
+      completedAt: entry.quizSession?.completedAt ?? null,
+    })).sort((a, b) => b.score - a.score || a.user.id.localeCompare(b.user.id));
+    return {
+      competitionId: id, status: 'COMPLETED',
+      rankings: ranked.map((entry) => ({
+        rank: ranked.filter((other) => other.score > entry.score).length + 1, ...entry,
+      })),
+      winnerIds: ranked.filter((entry) => entry.score === ranked[0]?.score).map((entry) => entry.user.id),
+    };
+  }
+
   async myQuiz(userId: string, id: string) {
     const competition = await this.prisma.competition.findUnique({
       where: { id }, select: { startsAt: true, endsAt: true },
