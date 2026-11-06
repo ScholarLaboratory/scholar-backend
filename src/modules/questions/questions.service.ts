@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -17,7 +18,15 @@ const slugify = (value: string) =>
 export class QuestionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createSubject(dto: CreateSubjectDto) {
+  private async assertEditor(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!user || !['FACILITATOR', 'ADMIN'].includes(user.role)) {
+      throw new ForbiddenException('Only facilitators and administrators can manage the question bank.');
+    }
+  }
+
+  async createSubject(userId: string, dto: CreateSubjectDto) {
+    await this.assertEditor(userId);
     const name = dto.name.trim();
     const slug = slugify(name);
     if (!slug) throw new BadRequestException('A valid subject name is required.');
@@ -38,7 +47,8 @@ export class QuestionsService {
     });
   }
 
-  async createTopic(dto: CreateTopicDto) {
+  async createTopic(userId: string, dto: CreateTopicDto) {
+    await this.assertEditor(userId);
     const subject = await this.prisma.subject.findUnique({ where: { id: dto.subjectId } });
     if (!subject) throw new NotFoundException('Subject not found.');
     const name = dto.name.trim();
@@ -65,7 +75,8 @@ export class QuestionsService {
     });
   }
 
-  async createQuestion(dto: CreateQuestionDto) {
+  async createQuestion(userId: string, dto: CreateQuestionDto) {
+    await this.assertEditor(userId);
     const topic = await this.prisma.topic.findUnique({ where: { id: dto.topicId } });
     if (!topic) throw new NotFoundException('Topic not found.');
     if (topic.subjectId !== dto.subjectId) {
@@ -81,8 +92,6 @@ export class QuestionsService {
     if (options.filter((option) => option.isCorrect).length !== 1) {
       throw new BadRequestException('Exactly one option must be correct.');
     }
-    // MVP: authenticated question authors can publish directly.
-    // Introduce moderator approval before enabling public contributions.
     return this.prisma.question.create({
       data: {
         subjectId: dto.subjectId,
