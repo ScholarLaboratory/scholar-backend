@@ -26,7 +26,10 @@ export class CompetitionExpiryWorker implements OnModuleInit, OnModuleDestroy {
     this.running = true;
     try {
       const expired = await this.prisma.competition.findMany({
-        where: { endsAt: { lte: new Date() } },
+        where: {
+          endsAt: { lte: new Date() },
+          participants: { some: { quizSession: { is: { status: 'IN_PROGRESS' } } } },
+        },
         select: { id: true },
         orderBy: { endsAt: 'desc' },
         take: 50,
