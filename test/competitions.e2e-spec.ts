@@ -70,6 +70,7 @@ describe('Competition flow (PostgreSQL e2e)', () => {
   it('registers students, starts synchronized quizzes and publishes results after expiry', async () => {
     const host = await register(1);
     const student = await register(2);
+    await prisma.user.update({ where: { id: host.id }, data: { role: 'FACILITATOR' } });
     const created = await request(app.getHttpServer()).post('/api/v1/competitions')
       .auth(host.token, { type: 'bearer' })
       .send({ title: 'Integration Cup', topicId, questionCount: 2, durationSeconds: 30 })
