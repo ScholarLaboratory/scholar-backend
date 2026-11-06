@@ -156,8 +156,9 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       .get(`/api/v1/competitions/${competitionId}/leaderboard`)
       .auth(host.token, { type: 'bearer' }).expect(200);
     expect(board.body.status).toBe('COMPLETED');
-    expect(board.body.rankings.map((entry: { rank: number }) => entry.rank)).toEqual([1, 1]);
-    expect(board.body.winnerIds).toHaveLength(2);
+    expect(board.body.rankings.map((entry: { rank: number }) => entry.rank))
+      .toEqual(Array(roster.length).fill(1));
+    expect(board.body.winnerIds).toHaveLength(roster.length);
     for (const id of quizIds) {
       const session = await prisma.quizSession.findUniqueOrThrow({ where: { id } });
       expect(session.status).toBe('COMPLETED');
