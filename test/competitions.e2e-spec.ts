@@ -233,6 +233,27 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       .send({ questionId: assignedQuestionId, selectedOptionId: mismatchedOption.id })
       .expect(400);
 
+    // Only the first answer to an assigned question may be persisted.
+    const validOption = await prisma.questionOption.findFirstOrThrow({
+      where: { questionId: assignedQuestionId },
+      select: { id: true },
+    });
+    const answerPayload = {
+      questionId: assignedQuestionId,
+      selectedOptionId: validOption.id,
+    };
+    await request(app.getHttpServer())
+      .post(`/api/v1/quizzes/${quizIds[0]}/answers`)
+      .auth(host.token, { type: 'bearer' })
+      .send(answerPayload).expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/quizzes/${quizIds[0]}/answers`)
+      .auth(host.token, { type: 'bearer' })
+      .send(answerPayload).expect(409);
+    expect(await prisma.quizAnswer.count({
+      where: { sessionId: quizIds[0], questionId: assignedQuestionId },
+    })).toBe(1);
+
     await prisma.competition.update({
       where: { id: competitionId },
       data: { endsAt: new Date(Date.now() - 1000) },
