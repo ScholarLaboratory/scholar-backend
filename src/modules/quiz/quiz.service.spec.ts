@@ -10,6 +10,7 @@ describe('QuizService', () => {
     prisma = {
       topic: { findUnique: jest.fn() },
       user: { findMany: jest.fn() },
+      challenge: { findFirst: jest.fn().mockResolvedValue(null), updateMany: jest.fn() },
       question: { findMany: jest.fn() },
       quizSession: { create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
       quizSessionQuestion: { findUnique: jest.fn() },
@@ -85,6 +86,27 @@ describe('QuizService', () => {
     }]);
     expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
       select: { id: true, username: true, fullName: true, school: true },
+    }));
+  });
+
+  it('automatically settles a 1v1 challenge when the second player finishes', async () => {
+    prisma.quizSession.findUnique.mockResolvedValue({
+      userId: 'u2', status: 'IN_PROGRESS', total: 1,
+    });
+    prisma.quizAnswer.findMany.mockResolvedValue([{ isCorrect: true }]);
+    prisma.quizSession.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    prisma.challenge.findFirst.mockResolvedValue({
+      id: 'challenge', challengerId: 'u1', opponentId: 'u2',
+      challengerQuiz: { status: 'COMPLETED', score: 0 },
+      opponentQuiz: { status: 'COMPLETED', score: 1 },
+    });
+    prisma.challenge.updateMany.mockResolvedValue({ count: 1 });
+    await expect(service.complete('u2', 'session')).resolves.toMatchObject({
+      score: 1, challengeResult: { challengeId: 'challenge', winnerId: 'u2' },
+    });
+    expect(prisma.challenge.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'challenge', status: 'ACTIVE' },
+      data: expect.objectContaining({ status: 'COMPLETED', winnerId: 'u2' }),
     }));
   });
 
