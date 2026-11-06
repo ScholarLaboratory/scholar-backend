@@ -12,4 +12,10 @@ export class CreateChallengeDto {
   @Min(1)
   @Max(20)
   questionCount?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(30)
+  @Max(7200)
+  durationSeconds?: number;
 }
