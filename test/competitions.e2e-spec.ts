@@ -45,6 +45,7 @@ describe('Competition flow (PostgreSQL e2e)', () => {
   afterAll(async () => {
     if (prisma) {
       await prisma.competition.deleteMany({ where: { topicId } });
+      await prisma.challenge.deleteMany({ where: { topicId } });
       await prisma.quizSession.deleteMany({ where: { userId: { in: ids } } });
       await prisma.question.deleteMany({ where: { topicId } });
       await prisma.topic.deleteMany({ where: { id: topicId } });
@@ -397,6 +398,64 @@ describe('Competition flow (PostgreSQL e2e)', () => {
     await request(app.getHttpServer())
       .get(`/api/v1/quizzes/${sessionId}`)
       .auth(otherStudent.token, { type: 'bearer' }).expect(403);
+  });
+
+  it('settles an expired 1v1 challenge once and rejects answers after the deadline', async () => {
+    const challenger = await register(6);
+    const opponent = await register(7);
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/challenges')
+      .auth(challenger.token, { type: 'bearer' })
+      .send({ opponentId: opponent.id, topicId, questionCount: 2, durationSeconds: 30 })
+      .expect(201);
+    const challengeId = created.body.id as string;
+    await request(app.getHttpServer())
+      .post(`/api/v1/challenges/${challengeId}/accept`)
+      .auth(opponent.token, { type: 'bearer' }).expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/challenges/${challengeId}/ready`)
+      .auth(challenger.token, { type: 'bearer' }).expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/challenges/${challengeId}/ready`)
+      .auth(opponent.token, { type: 'bearer' }).expect(201);
+    const challenge = await prisma.challenge.findUniqueOrThrow({ where: { id: challengeId } });
+    const challengerQuizId = challenge.challengerQuizId!;
+    const opponentQuizId = challenge.opponentQuizId!;
+    const assigned = await prisma.quizSessionQuestion.findFirstOrThrow({
+      where: { sessionId: challengerQuizId }, select: { questionId: true },
+    });
+    const correct = await prisma.questionOption.findFirstOrThrow({
+      where: { questionId: assigned.questionId, isCorrect: true }, select: { id: true },
+    });
+    await request(app.getHttpServer())
+      .post(`/api/v1/quizzes/${challengerQuizId}/answers`)
+      .auth(challenger.token, { type: 'bearer' })
+      .send({ questionId: assigned.questionId, selectedOptionId: correct.id }).expect(201);
+    await prisma.challenge.update({
+      where: { id: challengeId }, data: { endsAt: new Date(Date.now() - 1000) },
+    });
+    const [first, second, lateAnswer] = await Promise.all([
+      request(app.getHttpServer()).get(`/api/v1/challenges/${challengeId}`)
+        .auth(challenger.token, { type: 'bearer' }),
+      request(app.getHttpServer()).get(`/api/v1/challenges/${challengeId}`)
+        .auth(opponent.token, { type: 'bearer' }),
+      request(app.getHttpServer()).post(`/api/v1/quizzes/${challengerQuizId}/answers`)
+        .auth(challenger.token, { type: 'bearer' })
+        .send({ questionId: assigned.questionId, selectedOptionId: correct.id }),
+    ]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(lateAnswer.status).toBe(409);
+    const settled = await prisma.challenge.findUniqueOrThrow({ where: { id: challengeId } });
+    expect(settled).toMatchObject({ status: 'COMPLETED', winnerId: challenger.id });
+    for (const [id, score] of [[challengerQuizId, 1], [opponentQuizId, 0]] as const) {
+      const quiz = await prisma.quizSession.findUniqueOrThrow({ where: { id } });
+      expect(quiz).toMatchObject({ status: 'COMPLETED', score, xpEarned: score * 10 });
+    }
+    const finalized = await request(app.getHttpServer())
+      .post(`/api/v1/challenges/${challengeId}/finalize`)
+      .auth(opponent.token, { type: 'bearer' }).expect(201);
+    expect(finalized.body).toMatchObject({ status: 'COMPLETED', winnerId: challenger.id });
   });
 
 });
