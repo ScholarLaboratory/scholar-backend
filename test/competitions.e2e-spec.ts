@@ -45,6 +45,7 @@ describe('Competition flow (PostgreSQL e2e)', () => {
   afterAll(async () => {
     if (prisma) {
       await prisma.competition.deleteMany({ where: { topicId } });
+      await prisma.quizSession.deleteMany({ where: { userId: { in: ids } } });
       await prisma.question.deleteMany({ where: { topicId } });
       await prisma.topic.deleteMany({ where: { id: topicId } });
       await prisma.subject.deleteMany({ where: { id: subjectId } });
