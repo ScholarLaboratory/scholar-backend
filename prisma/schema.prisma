@@ -18,6 +18,8 @@ model User {
   level  String?
 
   quizSessions QuizSession[]
+  sentChallenges Challenge[] @relation("ChallengeChallenger")
+  receivedChallenges Challenge[] @relation("ChallengeOpponent")
 
   following Follow[] @relation("UserFollowing")
   followers Follow[] @relation("UserFollowers")
@@ -170,6 +172,8 @@ model QuizSession {
 
   questions QuizSessionQuestion[]
   answers   QuizAnswer[]
+  challengeParticipants Challenge[] @relation("ChallengerQuiz")
+  opponentChallengeParticipants Challenge[] @relation("OpponentQuiz")
 
   @@index([userId, startedAt])
 }
@@ -200,4 +204,35 @@ model QuizAnswer {
 
   @@unique([sessionId, questionId])
   @@index([questionId])
+}
+
+enum ChallengeStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  DECLINED
+}
+
+model Challenge {
+  id String @id @default(uuid())
+  challengerId String
+  opponentId String
+  topicId String
+  questionCount Int @default(10)
+  status ChallengeStatus @default(PENDING)
+  challengerQuizId String? @unique
+  opponentQuizId String? @unique
+  winnerId String?
+  createdAt DateTime @default(now())
+  acceptedAt DateTime?
+  completedAt DateTime?
+
+  challenger User @relation("ChallengeChallenger", fields: [challengerId], references: [id], onDelete: Cascade)
+  opponent User @relation("ChallengeOpponent", fields: [opponentId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Restrict)
+  challengerQuiz QuizSession? @relation("ChallengerQuiz", fields: [challengerQuizId], references: [id], onDelete: SetNull)
+  opponentQuiz QuizSession? @relation("OpponentQuiz", fields: [opponentQuizId], references: [id], onDelete: SetNull)
+
+  @@index([challengerId, createdAt])
+  @@index([opponentId, status])
 }
