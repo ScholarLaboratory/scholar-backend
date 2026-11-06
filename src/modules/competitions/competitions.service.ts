@@ -66,6 +66,80 @@ export class CompetitionsService {
     });
   }
 
+  async start(userId: string, id: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const competition = await tx.competition.findUnique({
+        where: { id },
+        include: { participants: { select: { userId: true, quizSessionId: true } } },
+      });
+      if (!competition) throw new NotFoundException('Competition not found.');
+      if (competition.facilitatorId !== userId) throw new ForbiddenException('Only the facilitator can start.');
+      if (competition.status !== 'CLOSED' || competition.startsAt) {
+        throw new ConflictException('Close registration before starting, and start only once.');
+      }
+      if (competition.scheduledAt && competition.scheduledAt.getTime() > Date.now()) {
+        throw new ConflictException('The scheduled start time has not arrived.');
+      }
+      if (competition.participants.length < 2) {
+        throw new BadRequestException('At least two participants are required.');
+      }
+
+      const questions = await tx.question.findMany({
+        where: { topicId: competition.topicId, status: 'PUBLISHED' },
+        select: { id: true },
+      });
+      if (questions.length < competition.questionCount) {
+        throw new BadRequestException('Not enough published questions remain.');
+      }
+      const shuffled = [...questions];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      const selected = shuffled.slice(0, competition.questionCount);
+      const locked = await tx.competition.updateMany({
+        where: { id, status: 'CLOSED', startsAt: null },
+        data: { startsAt: new Date(), endsAt: new Date(Date.now() + competition.durationSeconds * 1000) },
+      });
+      if (locked.count !== 1) throw new ConflictException('Competition already started.');
+
+      for (const participant of competition.participants) {
+        const quiz = await tx.quizSession.create({
+          data: {
+            userId: participant.userId,
+            total: selected.length,
+            questions: {
+              create: selected.map((question, position) => ({ questionId: question.id, position })),
+            },
+          },
+          select: { id: true },
+        });
+        await tx.competitionParticipant.update({
+          where: { competitionId_userId: { competitionId: id, userId: participant.userId } },
+          data: { quizSessionId: quiz.id },
+        });
+      }
+      const started = await tx.competition.findUniqueOrThrow({
+        where: { id },
+        select: { startsAt: true, endsAt: true },
+      });
+      return { id, status: 'STARTED', participantCount: competition.participants.length, ...started };
+    });
+  }
+
+  async myQuiz(userId: string, id: string) {
+    const competition = await this.prisma.competition.findUnique({
+      where: { id }, select: { startsAt: true, endsAt: true },
+    });
+    if (!competition) throw new NotFoundException('Competition not found.');
+    const participant = await this.prisma.competitionParticipant.findUnique({
+      where: { competitionId_userId: { competitionId: id, userId } },
+      select: { quizSessionId: true },
+    });
+    if (!participant) throw new ForbiddenException('Not registered for this competition.');
+    return { quizSessionId: participant.quizSessionId, startsAt: competition.startsAt, endsAt: competition.endsAt };
+  }
+
   async close(userId: string, id: string) {
     const competition = await this.prisma.competition.findUnique({ where: { id }, select: { facilitatorId: true } });
     if (!competition) throw new NotFoundException('Competition not found.');
