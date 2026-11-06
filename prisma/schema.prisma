@@ -6,7 +6,14 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  STUDENT
+  FACILITATOR
+  ADMIN
+}
+
 model User {
+  role UserRole @default(STUDENT)
   id       String @id @default(uuid())
   fullName String
   username String @unique
