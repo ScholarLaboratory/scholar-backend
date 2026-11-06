@@ -32,6 +32,12 @@ export class CompetitionsController {
     return this.service.join(req.user.id, id);
   }
 
+  @Get(':id/leaderboard')
+  @ApiOperation({ summary: 'View final competition rankings and joint winners' })
+  leaderboard(@Req() req: { user: { id: string } }, @Param('id', ParseUUIDPipe) id: string) {
+    return this.service.leaderboard(req.user.id, id);
+  }
+
   @Post(':id/start')
   @ApiOperation({ summary: 'Start synchronized quizzes for registered students' })
   start(@Req() req: { user: { id: string } }, @Param('id', ParseUUIDPipe) id: string) {
