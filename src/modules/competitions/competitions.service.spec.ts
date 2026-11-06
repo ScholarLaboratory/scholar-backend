@@ -8,6 +8,7 @@ describe('CompetitionsService', () => {
 
   beforeEach(() => {
     prisma = {
+      user: { findUnique: jest.fn().mockResolvedValue({ role: 'FACILITATOR' }) },
       topic: { findUnique: jest.fn() },
       question: { count: jest.fn() },
       competition: { create: jest.fn(), findUnique: jest.fn(), findUniqueOrThrow: jest.fn(), updateMany: jest.fn() },
@@ -17,6 +18,14 @@ describe('CompetitionsService', () => {
     };
     prisma.$transaction = jest.fn(async (fn: (tx: any) => Promise<any>) => fn(prisma));
     service = new CompetitionsService(prisma as PrismaService);
+  });
+
+  it('rejects competition creation by ordinary students', async () => {
+    prisma.user.findUnique.mockResolvedValue({ role: 'STUDENT' });
+    await expect(service.create('student', {
+      title: 'Unauthorized event', topicId: 'topic', questionCount: 10,
+    })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.competition.create).not.toHaveBeenCalled();
   });
 
   it('rejects competitions without enough published questions', async () => {
