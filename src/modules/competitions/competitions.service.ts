@@ -141,6 +141,8 @@ export class CompetitionsService {
       if (!event?.endsAt || event.endsAt.getTime() > Date.now()) return;
       for (const participant of event.participants) {
         if (!participant.quizSessionId) continue;
+        // Use the same row lock as answer submission and manual completion.
+        await tx.$queryRaw`SELECT id FROM "QuizSession" WHERE id = ${participant.quizSessionId}::uuid FOR UPDATE`;
         const session = await tx.quizSession.findUnique({
           where: { id: participant.quizSessionId },
           select: { status: true },
