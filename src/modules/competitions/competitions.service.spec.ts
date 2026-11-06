@@ -8,6 +8,7 @@ describe('CompetitionsService', () => {
 
   beforeEach(() => {
     prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
       user: { findUnique: jest.fn().mockResolvedValue({ role: 'FACILITATOR' }) },
       topic: { findUnique: jest.fn() },
       question: { count: jest.fn() },
