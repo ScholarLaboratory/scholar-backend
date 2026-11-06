@@ -54,6 +54,24 @@ export class QuizService {
     return this.getSession(userId, session.id);
   }
 
+  private async assertChallengeWindow(tx: Prisma.TransactionClient, sessionId: string) {
+    const challenge = await tx.challenge.findFirst({
+      where: { OR: [{ challengerQuizId: sessionId }, { opponentQuizId: sessionId }] },
+      select: { startsAt: true, endsAt: true },
+    });
+    if (!challenge) return;
+    if (!challenge.startsAt || !challenge.endsAt) {
+      throw new ConflictException('Waiting for both players to be ready.');
+    }
+    const now = Date.now();
+    if (now < challenge.startsAt.getTime()) {
+      throw new ConflictException('Challenge has not started yet.');
+    }
+    if (now >= challenge.endsAt.getTime()) {
+      throw new ConflictException('Challenge time has expired.');
+    }
+  }
+
   async getSession(userId: string, sessionId: string) {
     const session = await this.prisma.quizSession.findUnique({
       where: { id: sessionId },
@@ -77,6 +95,7 @@ export class QuizService {
     });
     if (!session) throw new NotFoundException('Quiz session not found.');
     if (session.userId !== userId) throw new ForbiddenException('Not your quiz session.');
+    await this.assertChallengeWindow(this.prisma, sessionId);
     return {
       id: session.id,
       status: session.status,
@@ -104,6 +123,7 @@ export class QuizService {
       if (session.status !== QuizSessionStatus.IN_PROGRESS) {
         throw new ConflictException('Quiz already completed.');
       }
+      await this.assertChallengeWindow(tx, sessionId);
       const membership = await tx.quizSessionQuestion.findUnique({
         where: { sessionId_questionId: { sessionId, questionId: dto.questionId } },
       });
@@ -146,6 +166,7 @@ export class QuizService {
       if (session.status !== QuizSessionStatus.IN_PROGRESS) {
         throw new ConflictException('Quiz already completed.');
       }
+      await this.assertChallengeWindow(tx, sessionId);
 
       const answers = await tx.quizAnswer.findMany({
         where: { sessionId },
