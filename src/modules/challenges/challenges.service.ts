@@ -114,11 +114,12 @@ export class ChallengesService {
       });
       const challengerQuiz = await createQuiz(challenge.challengerId);
       const opponentQuiz = await createQuiz(challenge.opponentId);
-      return tx.challenge.update({
+      const accepted = await tx.challenge.update({
         where: { id: challengeId },
         data: { challengerQuizId: challengerQuiz.id, opponentQuizId: opponentQuiz.id },
-        select: { id: true, status: true, challengerQuizId: true, opponentQuizId: true },
+        select: { id: true, status: true, opponentQuizId: true },
       });
+      return { id: accepted.id, status: accepted.status, myQuizId: accepted.opponentQuizId };
     });
   }
 
