@@ -100,6 +100,23 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       }
     }
     await prisma.user.update({ where: { id: host.id }, data: { role: 'FACILITATOR' } });
+    // A facilitator can author content, while the public listing remains answer-safe.
+    const authored = await request(app.getHttpServer()).post('/api/v1/questions')
+      .auth(host.token, { type: 'bearer' })
+      .send({
+        subjectId, topicId, questionText: 'Facilitator authored question?',
+        academicLevel: 'SECONDARY', difficulty: 'BEGINNER',
+        options: [{ optionText: 'Yes', isCorrect: true }, { optionText: 'No', isCorrect: false }],
+      }).expect(201);
+    expect(authored.body.options.some((option: { isCorrect: boolean }) => option.isCorrect))
+      .toBe(true);
+    const publicQuestions = await request(app.getHttpServer())
+      .get(`/api/v1/topics/${topicId}/questions`).expect(200);
+    const publicAuthored = publicQuestions.body.find((question: { id: string }) =>
+      question.id === authored.body.id);
+    expect(publicAuthored).toBeDefined();
+    expect(publicAuthored.options.every((option: Record<string, unknown>) =>
+      !Object.prototype.hasOwnProperty.call(option, 'isCorrect'))).toBe(true);
     const created = await request(app.getHttpServer()).post('/api/v1/competitions')
       .auth(host.token, { type: 'bearer' })
       .send({ title: 'Integration Cup', topicId, questionCount: 2, durationSeconds: 30 })
