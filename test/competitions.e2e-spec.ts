@@ -254,6 +254,26 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       where: { sessionId: quizIds[0], questionId: assignedQuestionId },
     })).toBe(1);
 
+    // Two simultaneous submissions for another question must have one winner.
+    const secondQuestionId = questionSets[0][1];
+    const secondOption = await prisma.questionOption.findFirstOrThrow({
+      where: { questionId: secondQuestionId, isCorrect: false },
+      select: { id: true },
+    });
+    const concurrentPayload = {
+      questionId: secondQuestionId, selectedOptionId: secondOption.id,
+    };
+    const concurrentResults = await Promise.all([
+      request(app.getHttpServer()).post(`/api/v1/quizzes/${quizIds[0]}/answers`)
+        .auth(host.token, { type: 'bearer' }).send(concurrentPayload),
+      request(app.getHttpServer()).post(`/api/v1/quizzes/${quizIds[0]}/answers`)
+        .auth(host.token, { type: 'bearer' }).send(concurrentPayload),
+    ]);
+    expect(concurrentResults.map((result) => result.status).sort()).toEqual([201, 409]);
+    expect(await prisma.quizAnswer.count({
+      where: { sessionId: quizIds[0], questionId: secondQuestionId },
+    })).toBe(1);
+
     await prisma.competition.update({
       where: { id: competitionId },
       data: { endsAt: new Date(Date.now() - 1000) },
