@@ -113,6 +113,25 @@ describe('CompetitionsService', () => {
     expect(result.rankings.map((entry) => entry.rank)).toEqual([1, 1, 3]);
   });
 
+  it('locks the competition before checking registration status', async () => {
+    prisma.competition.findUnique.mockResolvedValue({ status: 'OPEN' });
+    prisma.competitionParticipant.findUnique.mockResolvedValue(null);
+    prisma.competitionParticipant.create.mockResolvedValue({});
+    await service.join('student', 'competition');
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.$queryRaw.mock.invocationCallOrder[0])
+      .toBeLessThan(prisma.competition.findUnique.mock.invocationCallOrder[0]);
+  });
+
+  it('locks the competition when closing registration', async () => {
+    prisma.competition.findUnique.mockResolvedValue({ facilitatorId: 'host' });
+    prisma.competition.updateMany.mockResolvedValue({ count: 1 });
+    await expect(service.close('host', 'competition')).resolves.toEqual({
+      id: 'competition', status: 'CLOSED',
+    });
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects registration after the facilitator closes it', async () => {
     prisma.competition.findUnique.mockResolvedValue({ status: 'CLOSED' });
     await expect(service.join('student', 'competition')).rejects.toBeInstanceOf(ConflictException);
