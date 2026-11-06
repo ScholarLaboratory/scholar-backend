@@ -167,6 +167,19 @@ export class ChallengesService {
   // A scheduled worker can call this method later for proactive settlement.
   async settleExpired(challengeId: string) {
     return this.prisma.$transaction(async (tx) => {
+      // Serialize concurrent expiry workers and avoid reading stale challenge state.
+      await tx.$queryRaw`SELECT id FROM "Challenge" WHERE id = ${challengeId}::text FOR UPDATE`;
+      const linked = await tx.challenge.findUnique({
+        where: { id: challengeId },
+        select: { challengerQuizId: true, opponentQuizId: true },
+      });
+      // Quiz submissions/completions lock these same rows. Lock in stable order
+      // before reading answers so settlement cannot race with a submitted answer.
+      const quizIds = [linked?.challengerQuizId, linked?.opponentQuizId]
+        .filter((id): id is string => Boolean(id)).sort();
+      for (const quizId of quizIds) {
+        await tx.$queryRaw`SELECT id FROM "QuizSession" WHERE id = ${quizId}::text FOR UPDATE`;
+      }
       const challenge = await tx.challenge.findUnique({
         where: { id: challengeId },
         include: {
