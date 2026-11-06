@@ -221,6 +221,18 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       .expect(403);
 
 
+    // The question is assigned, but the selected option belongs to another question.
+    const assignedQuestionId = questionSets[0][0];
+    const mismatchedOption = await prisma.questionOption.findFirstOrThrow({
+      where: { questionId: { not: assignedQuestionId }, question: { topicId } },
+      select: { id: true },
+    });
+    await request(app.getHttpServer())
+      .post(`/api/v1/quizzes/${quizIds[0]}/answers`)
+      .auth(host.token, { type: 'bearer' })
+      .send({ questionId: assignedQuestionId, selectedOptionId: mismatchedOption.id })
+      .expect(400);
+
     await prisma.competition.update({
       where: { id: competitionId },
       data: { endsAt: new Date(Date.now() - 1000) },
