@@ -46,4 +46,4 @@ jobs:
       - run: pnpm exec prisma migrate deploy
       - run: pnpm run build
       - run: pnpm exec jest --runInBand
-      - run: pnpm run test:e2e -- --runInBand
+      - run: pnpm exec jest --config ./test/jest-e2e.json --runInBand
