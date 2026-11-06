@@ -337,6 +337,15 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       .send({ topicId, questionCount: 2 }).expect(201);
     const sessionId = started.body.id as string;
     expect(started.body.questions).toHaveLength(2);
+    await request(app.getHttpServer())
+      .post(`/api/v1/quizzes/${sessionId}/complete`)
+      .auth(player.token, { type: 'bearer' }).expect(400);
+    const incomplete = await prisma.quizSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+    expect(incomplete).toMatchObject({
+      status: 'IN_PROGRESS', score: 0, xpEarned: 0,
+    });
     for (const question of started.body.questions as { id: string }[]) {
       const correct = await prisma.questionOption.findFirstOrThrow({
         where: { questionId: question.id, isCorrect: true },
