@@ -8,6 +8,7 @@ describe('QuizService', () => {
 
   beforeEach(() => {
     prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
       topic: { findUnique: jest.fn() },
       user: { findMany: jest.fn() },
       challenge: { findFirst: jest.fn().mockResolvedValue(null), updateMany: jest.fn() },
