@@ -178,10 +178,13 @@ export class ChallengesService {
       const opponentScore = challenge.opponentQuiz.score;
       const winnerId = challengerScore === opponentScore ? null :
         challengerScore > opponentScore ? challenge.challengerId : challenge.opponentId;
-      await tx.challenge.updateMany({
+      const finalized = await tx.challenge.updateMany({
         where: { id: challengeId, status: ChallengeStatus.ACTIVE },
         data: { status: ChallengeStatus.COMPLETED, winnerId, completedAt: new Date() },
       });
+      if (finalized.count !== 1) {
+        throw new ConflictException('Challenge has already been finalized.');
+      }
       return { status: ChallengeStatus.COMPLETED, winnerId, challengerScore, opponentScore };
     });
   }
