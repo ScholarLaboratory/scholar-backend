@@ -75,6 +75,8 @@ describe('CompetitionsService', () => {
     await expect(service.start('host', 'competition')).resolves.toMatchObject({
       status: 'STARTED', participantCount: 2,
     });
+    expect(prisma.$queryRaw.mock.invocationCallOrder[0])
+      .toBeLessThan(prisma.competition.findUnique.mock.invocationCallOrder[0]);
     const first = prisma.quizSession.create.mock.calls[0][0].data.questions.create;
     const second = prisma.quizSession.create.mock.calls[1][0].data.questions.create;
     expect(first).toEqual(second);
