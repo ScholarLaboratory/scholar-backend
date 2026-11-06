@@ -146,6 +146,7 @@ model Topic {
   subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
   questions Question[]
+  challenges Challenge[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
