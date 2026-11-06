@@ -378,6 +378,16 @@ describe('Competition flow (PostgreSQL e2e)', () => {
     expect(results.body).toContainEqual(expect.objectContaining({
       id: sessionId, score: 2, xpEarned: 20,
     }));
+    const otherStudent = await register(5);
+    const otherResults = await request(app.getHttpServer())
+      .get('/api/v1/quizzes/results/me')
+      .auth(otherStudent.token, { type: 'bearer' }).expect(200);
+    expect(otherResults.body).not.toContainEqual(expect.objectContaining({
+      id: sessionId,
+    }));
+    await request(app.getHttpServer())
+      .get(`/api/v1/quizzes/${sessionId}`)
+      .auth(otherStudent.token, { type: 'bearer' }).expect(403);
   });
 
 });
