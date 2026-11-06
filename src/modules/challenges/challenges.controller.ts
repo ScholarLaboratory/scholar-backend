@@ -35,6 +35,12 @@ export class ChallengesController {
     return this.challengesService.accept(req.user.id, id);
   }
 
+  @Post(':id/ready')
+  @ApiOperation({ summary: 'Signal ready; shared countdown starts when both players are ready' })
+  ready(@Req() req: { user: { id: string } }, @Param('id', ParseUUIDPipe) id: string) {
+    return this.challengesService.ready(req.user.id, id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'View your challenge and its result' })
   get(@Req() req: { user: { id: string } }, @Param('id', ParseUUIDPipe) id: string) {
