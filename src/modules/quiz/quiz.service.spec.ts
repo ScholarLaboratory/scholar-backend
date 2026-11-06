@@ -120,7 +120,9 @@ describe('QuizService', () => {
     });
     prisma.quizAnswer.findMany.mockResolvedValue([{ isCorrect: true }]);
     prisma.quizSession.updateMany = jest.fn().mockResolvedValue({ count: 1 });
-    prisma.challenge.findFirst.mockResolvedValue({
+    prisma.challenge.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
       id: 'challenge', challengerId: 'u1', opponentId: 'u2',
       challengerQuiz: { status: 'COMPLETED', score: 0 },
       opponentQuiz: { status: 'COMPLETED', score: 1 },
