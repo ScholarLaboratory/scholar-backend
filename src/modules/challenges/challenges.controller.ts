@@ -17,6 +17,18 @@ export class ChallengesController {
     return this.challengesService.create(req.user.id, dto);
   }
 
+  @Get('mine')
+  @ApiOperation({ summary: 'List challenges sent to or received by me' })
+  mine(@Req() req: { user: { id: string } }) {
+    return this.challengesService.myChallenges(req.user.id);
+  }
+
+  @Post(':id/decline')
+  @ApiOperation({ summary: 'Decline a pending challenge invitation' })
+  decline(@Req() req: { user: { id: string } }, @Param('id', ParseUUIDPipe) id: string) {
+    return this.challengesService.decline(req.user.id, id);
+  }
+
   @Post(':id/accept')
   @ApiOperation({ summary: 'Accept a challenge and create matching quizzes' })
   accept(@Req() req: { user: { id: string } }, @Param('id', ParseUUIDPipe) id: string) {
