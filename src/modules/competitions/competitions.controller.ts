@@ -32,6 +32,18 @@ export class CompetitionsController {
     return this.service.join(req.user.id, id);
   }
 
+  @Post(':id/start')
+  @ApiOperation({ summary: 'Start synchronized quizzes for registered students' })
+  start(@Req() req: { user: { id: string } }, @Param('id', ParseUUIDPipe) id: string) {
+    return this.service.start(req.user.id, id);
+  }
+
+  @Get(':id/my-quiz')
+  @ApiOperation({ summary: 'Get your competition quiz and shared deadline' })
+  myQuiz(@Req() req: { user: { id: string } }, @Param('id', ParseUUIDPipe) id: string) {
+    return this.service.myQuiz(req.user.id, id);
+  }
+
   @Post(':id/close')
   close(@Req() req: { user: { id: string } }, @Param('id', ParseUUIDPipe) id: string) {
     return this.service.close(req.user.id, id);
