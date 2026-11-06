@@ -178,6 +178,33 @@ describe('Competition flow (PostgreSQL e2e)', () => {
     expect(board.body.rankings.map((entry: { rank: number }) => entry.rank))
       .toEqual(Array(roster.length).fill(1));
     expect(board.body.winnerIds).toHaveLength(roster.length);
+    const finalSnapshot = JSON.stringify({
+      rankings: board.body.rankings,
+      winnerIds: board.body.winnerIds,
+    });
+    const firstQuestion = await prisma.quizSessionQuestion.findFirstOrThrow({
+      where: { sessionId: quizIds[0] },
+      select: { questionId: true },
+    });
+    const firstOption = await prisma.questionOption.findFirstOrThrow({
+      where: { questionId: firstQuestion.questionId },
+      select: { id: true },
+    });
+    await request(app.getHttpServer())
+      .post(`/api/v1/quizzes/${quizIds[0]}/answers`)
+      .auth(host.token, { type: 'bearer' })
+      .send({ questionId: firstQuestion.questionId, selectedOptionId: firstOption.id })
+      .expect(409);
+    await request(app.getHttpServer())
+      .post(`/api/v1/quizzes/${quizIds[0]}/complete`)
+      .auth(host.token, { type: 'bearer' }).expect(409);
+    const unchangedBoard = await request(app.getHttpServer())
+      .get(`/api/v1/competitions/${competitionId}/leaderboard`)
+      .auth(student.token, { type: 'bearer' }).expect(200);
+    expect(JSON.stringify({
+      rankings: unchangedBoard.body.rankings,
+      winnerIds: unchangedBoard.body.winnerIds,
+    })).toBe(finalSnapshot);
     for (const id of quizIds) {
       const session = await prisma.quizSession.findUniqueOrThrow({ where: { id } });
       expect(session.status).toBe('COMPLETED');
