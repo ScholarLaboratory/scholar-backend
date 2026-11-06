@@ -7,6 +7,10 @@ export class CompetitionsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(facilitatorId: string, dto: CreateCompetitionDto) {
+    const organizer = await this.prisma.user.findUnique({ where: { id: facilitatorId }, select: { role: true } });
+    if (!organizer || !['FACILITATOR', 'ADMIN'].includes(organizer.role)) {
+      throw new ForbiddenException('Only approved facilitators or administrators can create competitions.');
+    }
     const [topic, count] = await Promise.all([
       this.prisma.topic.findUnique({ where: { id: dto.topicId }, select: { id: true } }),
       this.prisma.question.count({ where: { topicId: dto.topicId, status: 'PUBLISHED' } }),
