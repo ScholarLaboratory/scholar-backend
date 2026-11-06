@@ -181,6 +181,26 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       questionSets.push(quiz.body.questions.map((question: { id: string }) => question.id));
     }
     expect(questionSets[0]).toEqual(questionSets[1]);
+    const foreignQuestion = await prisma.question.create({
+      data: {
+        subjectId, topicId, questionText: 'Not assigned to this quiz',
+        academicLevel: 'SECONDARY', difficulty: 'BEGINNER',
+        source: 'PLATFORM', status: 'PUBLISHED',
+        options: { create: [
+          { optionText: 'Foreign correct', isCorrect: true },
+          { optionText: 'Foreign incorrect', isCorrect: false },
+        ] },
+      },
+      include: { options: true },
+    });
+    await request(app.getHttpServer())
+      .post(`/api/v1/quizzes/${quizIds[0]}/answers`)
+      .auth(host.token, { type: 'bearer' })
+      .send({
+        questionId: foreignQuestion.id,
+        selectedOptionId: foreignQuestion.options[0].id,
+      }).expect(400);
+
     // Quiz IDs are opaque, but ownership must still be enforced on every route.
     await request(app.getHttpServer())
       .get(`/api/v1/quizzes/${quizIds[0]}`)
