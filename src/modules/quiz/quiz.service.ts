@@ -129,7 +129,7 @@ export class QuizService {
   async submitAnswer(userId: string, sessionId: string, dto: SubmitAnswerDto) {
     return this.prisma.$transaction(async (tx) => {
       // Serialize submissions and completion on this quiz session row.
-      await tx.$queryRaw`SELECT id FROM "QuizSession" WHERE id = ${sessionId}::uuid FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "QuizSession" WHERE id = ${sessionId}::text FOR UPDATE`;
       const session = await tx.quizSession.findUnique({
         where: { id: sessionId },
         select: { userId: true, status: true },
@@ -173,7 +173,7 @@ export class QuizService {
   async complete(userId: string, sessionId: string) {
     return this.prisma.$transaction(async (tx) => {
       // Prevent a concurrent answer or expiry settlement from changing the score.
-      await tx.$queryRaw`SELECT id FROM "QuizSession" WHERE id = ${sessionId}::uuid FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "QuizSession" WHERE id = ${sessionId}::text FOR UPDATE`;
       // Conditional update provides a single successful completion even if requests race.
       const session = await tx.quizSession.findUnique({
         where: { id: sessionId },
