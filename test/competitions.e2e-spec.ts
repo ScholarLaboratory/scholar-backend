@@ -235,7 +235,7 @@ describe('Competition flow (PostgreSQL e2e)', () => {
 
     // Only the first answer to an assigned question may be persisted.
     const validOption = await prisma.questionOption.findFirstOrThrow({
-      where: { questionId: assignedQuestionId },
+      where: { questionId: assignedQuestionId, isCorrect: false },
       select: { id: true },
     });
     const answerPayload = {
