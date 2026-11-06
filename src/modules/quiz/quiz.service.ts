@@ -59,7 +59,19 @@ export class QuizService {
       where: { OR: [{ challengerQuizId: sessionId }, { opponentQuizId: sessionId }] },
       select: { startsAt: true, endsAt: true },
     });
-    if (!challenge) return;
+    if (!challenge) {
+      const participant = await tx.competitionParticipant.findUnique({
+        where: { quizSessionId: sessionId },
+        select: { competition: { select: { startsAt: true, endsAt: true } } },
+      });
+      if (!participant) return;
+      const { startsAt, endsAt } = participant.competition;
+      if (!startsAt || !endsAt) throw new ConflictException('Competition has not started.');
+      const now = Date.now();
+      if (now < startsAt.getTime()) throw new ConflictException('Competition has not started.');
+      if (now >= endsAt.getTime()) throw new ConflictException('Competition time has expired.');
+      return;
+    }
     if (!challenge.startsAt || !challenge.endsAt) {
       throw new ConflictException('Waiting for both players to be ready.');
     }
