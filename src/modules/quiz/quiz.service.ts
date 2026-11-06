@@ -178,6 +178,30 @@ export class QuizService {
     });
   }
 
+
+  async leaderboard(limit = 20) {
+    const totals = await this.prisma.quizSession.groupBy({
+      by: ['userId'],
+      where: { status: QuizSessionStatus.COMPLETED },
+      _sum: { xpEarned: true, score: true },
+      _count: { id: true },
+      orderBy: [{ _sum: { xpEarned: 'desc' } }, { userId: 'asc' }],
+      take: limit,
+    });
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: totals.map((entry) => entry.userId) } },
+      select: { id: true, username: true, fullName: true, school: true },
+    });
+    const byId = new Map(users.map((user) => [user.id, user]));
+    return totals.map((entry, index) => ({
+      rank: index + 1,
+      user: byId.get(entry.userId) ?? { id: entry.userId },
+      totalXp: entry._sum.xpEarned ?? 0,
+      correctAnswers: entry._sum.score ?? 0,
+      completedQuizzes: entry._count.id,
+    }));
+  }
+
   async myResults(userId: string) {
     return this.prisma.quizSession.findMany({
       where: { userId, status: QuizSessionStatus.COMPLETED },
