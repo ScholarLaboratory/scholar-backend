@@ -124,6 +124,12 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       .auth(lateStudent.token, { type: 'bearer' }).expect(409);
     await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/start`)
       .auth(student.token, { type: 'bearer' }).expect(403);
+    const beforeStart = await request(app.getHttpServer())
+      .get(`/api/v1/competitions/${competitionId}/leaderboard`)
+      .auth(student.token, { type: 'bearer' }).expect(200);
+    expect(beforeStart.body).toMatchObject({
+      competitionId, status: 'NOT_STARTED', rankings: [],
+    });
     const started = await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/start`)
       .auth(host.token, { type: 'bearer' }).expect(201);
     expect(new Date(started.body.endsAt).getTime() - new Date(started.body.startsAt).getTime())
