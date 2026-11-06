@@ -103,8 +103,21 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/join`)
         .auth(user.token, { type: 'bearer' }).expect(201);
     }
-    await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/close`)
-      .auth(host.token, { type: 'bearer' }).expect(201);
+    const lateStudent = await register(3);
+    const [lateJoin, closed] = await Promise.all([
+      request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/join`)
+        .auth(lateStudent.token, { type: 'bearer' }),
+      request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/close`)
+        .auth(host.token, { type: 'bearer' }),
+    ]);
+    expect(closed.status).toBe(201);
+    expect([201, 409]).toContain(lateJoin.status);
+    const roster = await prisma.competitionParticipant.findMany({
+      where: { competitionId }, select: { userId: true },
+    });
+    expect(roster.some((entry) => entry.userId === lateStudent.id)).toBe(lateJoin.status === 201);
+    await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/join`)
+      .auth(lateStudent.token, { type: 'bearer' }).expect(409);
     const started = await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/start`)
       .auth(host.token, { type: 'bearer' }).expect(201);
     expect(new Date(started.body.endsAt).getTime() - new Date(started.body.startsAt).getTime())
