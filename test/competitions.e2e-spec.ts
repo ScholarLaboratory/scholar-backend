@@ -420,7 +420,22 @@ describe('Competition flow (PostgreSQL e2e)', () => {
     }
     await request(app.getHttpServer())
       .post(`/api/v1/challenges/${challengeId}/accept`)
+      .auth(challenger.token, { type: 'bearer' }).expect(403);
+    await request(app.getHttpServer())
+      .post(`/api/v1/challenges/${challengeId}/ready`)
+      .auth(challenger.token, { type: 'bearer' }).expect(409);
+    await request(app.getHttpServer())
+      .post(`/api/v1/challenges/${challengeId}/accept`)
       .auth(opponent.token, { type: 'bearer' }).expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/challenges/${challengeId}/accept`)
+      .auth(opponent.token, { type: 'bearer' }).expect(409);
+    const assignedSessions = await prisma.challenge.findUniqueOrThrow({
+      where: { id: challengeId },
+    });
+    expect(assignedSessions.challengerQuizId).toBeTruthy();
+    expect(assignedSessions.opponentQuizId).toBeTruthy();
+    expect(assignedSessions.challengerQuizId).not.toBe(assignedSessions.opponentQuizId);
     const [challengerReady, opponentReady] = await Promise.all([
       request(app.getHttpServer())
         .post(`/api/v1/challenges/${challengeId}/ready`)
