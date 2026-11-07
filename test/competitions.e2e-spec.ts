@@ -124,10 +124,25 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       .expect(201);
     const competitionId = created.body.id as string;
 
+    // Draft events are visible only to their organizer in the discovery feed.
+    const hostDrafts = await request(app.getHttpServer()).get('/api/v1/competitions')
+      .auth(host.token, { type: 'bearer' }).expect(200);
+    expect(hostDrafts.body.some((event: { id: string }) => event.id === competitionId)).toBe(true);
+    const studentDrafts = await request(app.getHttpServer()).get('/api/v1/competitions')
+      .auth(student.token, { type: 'bearer' }).expect(200);
+    expect(studentDrafts.body.some((event: { id: string }) => event.id === competitionId)).toBe(false);
+    await request(app.getHttpServer()).get('/api/v1/competitions').expect(401);
+
     await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/open`)
       .auth(student.token, { type: 'bearer' }).expect(403);
     await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/open`)
       .auth(host.token, { type: 'bearer' }).expect(201);
+    const discoverable = await request(app.getHttpServer()).get('/api/v1/competitions')
+      .auth(student.token, { type: 'bearer' }).expect(200);
+    const event = discoverable.body.find((entry: { id: string }) => entry.id === competitionId);
+    expect(event).toMatchObject({ title: 'Integration Cup', status: 'OPEN' });
+    expect(event.topic.subject.name).toBe('E2E ' + tag);
+    expect(event.facilitator).not.toHaveProperty('email');
     for (const user of [host, student]) {
       await request(app.getHttpServer()).post(`/api/v1/competitions/${competitionId}/join`)
         .auth(user.token, { type: 'bearer' }).expect(201);
