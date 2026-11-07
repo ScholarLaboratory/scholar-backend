@@ -14,6 +14,26 @@ export class UsersService {
     private readonly prisma: PrismaService,
   ) {}
 
+  async searchStudents(requesterId: string, query: string) {
+    const term = query.trim();
+    if (term.length < 2 || term.length > 60) {
+      throw new BadRequestException('Search must contain between 2 and 60 characters.');
+    }
+    return this.prisma.user.findMany({
+      where: {
+        id: { not: requesterId },
+        role: 'STUDENT',
+        OR: [
+          { username: { contains: term, mode: 'insensitive' } },
+          { fullName: { contains: term, mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true, username: true, fullName: true, school: true, level: true },
+      orderBy: { username: 'asc' },
+      take: 10,
+    });
+  }
+
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },
