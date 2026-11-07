@@ -6,7 +6,14 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  STUDENT
+  FACILITATOR
+  ADMIN
+}
+
 model User {
+  role UserRole @default(STUDENT)
   id       String @id @default(uuid())
   fullName String
   username String @unique
@@ -16,6 +23,12 @@ model User {
   bio    String?
   school String?
   level  String?
+
+  hostedCompetitions Competition[] @relation("CompetitionHost")
+  competitionEntries CompetitionParticipant[]
+  quizSessions QuizSession[]
+  sentChallenges Challenge[] @relation("ChallengeChallenger")
+  receivedChallenges Challenge[] @relation("ChallengeOpponent")
 
   following Follow[] @relation("UserFollowing")
   followers Follow[] @relation("UserFollowers")
@@ -59,6 +72,9 @@ model Question {
 
   topic Topic @relation(fields: [topicId], references: [id])
 
+  quizQuestions QuizSessionQuestion[]
+  quizAnswers QuizAnswer[]
+
   options QuestionOption[]
 
   createdAt DateTime @default(now())
@@ -80,6 +96,8 @@ model QuestionOption {
 
   optionText String
   isCorrect  Boolean
+
+  quizAnswers QuizAnswer[]
 
   createdAt DateTime @default(now())
 
@@ -137,10 +155,136 @@ model Topic {
   subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
   questions Question[]
+  challenges Challenge[]
+  competitions Competition[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([subjectId, slug])
   @@index([subjectId])
+}
+
+enum QuizSessionStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+model QuizSession {
+  id          String @id @default(uuid())
+  userId      String
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      QuizSessionStatus @default(IN_PROGRESS)
+  score       Int @default(0)
+  total       Int
+  xpEarned    Int @default(0)
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+
+  questions QuizSessionQuestion[]
+  answers   QuizAnswer[]
+  challengeParticipants Challenge[] @relation("ChallengerQuiz")
+  opponentChallengeParticipants Challenge[] @relation("OpponentQuiz")
+  competitionParticipant CompetitionParticipant?
+
+  @@index([userId, startedAt])
+}
+
+model QuizSessionQuestion {
+  id        String @id @default(uuid())
+  sessionId String
+  questionId String
+  position  Int
+  session   QuizSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question  Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, questionId])
+  @@unique([sessionId, position])
+}
+
+model QuizAnswer {
+  id               String @id @default(uuid())
+  sessionId        String
+  questionId       String
+  selectedOptionId String
+  isCorrect        Boolean
+  createdAt        DateTime @default(now())
+
+  session        QuizSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question       Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  selectedOption QuestionOption @relation(fields: [selectedOptionId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, questionId])
+  @@index([questionId])
+}
+
+enum ChallengeStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  DECLINED
+}
+
+model Challenge {
+  id String @id @default(uuid())
+  challengerId String
+  opponentId String
+  topicId String
+  questionCount Int @default(10)
+  durationSeconds Int @default(300)
+  challengerReadyAt DateTime?
+  opponentReadyAt DateTime?
+  startsAt DateTime?
+  endsAt DateTime?
+  status ChallengeStatus @default(PENDING)
+  challengerQuizId String? @unique
+  opponentQuizId String? @unique
+  winnerId String?
+  createdAt DateTime @default(now())
+  acceptedAt DateTime?
+  completedAt DateTime?
+
+  challenger User @relation("ChallengeChallenger", fields: [challengerId], references: [id], onDelete: Cascade)
+  opponent User @relation("ChallengeOpponent", fields: [opponentId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Restrict)
+  challengerQuiz QuizSession? @relation("ChallengerQuiz", fields: [challengerQuizId], references: [id], onDelete: SetNull)
+  opponentQuiz QuizSession? @relation("OpponentQuiz", fields: [opponentQuizId], references: [id], onDelete: SetNull)
+
+  @@index([challengerId, createdAt])
+  @@index([opponentId, status])
+}
+
+enum CompetitionStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+model Competition {
+  id String @id @default(uuid())
+  title String
+  facilitatorId String
+  topicId String
+  questionCount Int @default(10)
+  durationSeconds Int @default(300)
+  status CompetitionStatus @default(DRAFT)
+  scheduledAt DateTime?
+  startsAt DateTime?
+  endsAt DateTime?
+  createdAt DateTime @default(now())
+  facilitator User @relation("CompetitionHost", fields: [facilitatorId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Restrict)
+  participants CompetitionParticipant[]
+  @@index([facilitatorId, createdAt])
+}
+
+model CompetitionParticipant {
+  competitionId String
+  userId String
+  joinedAt DateTime @default(now())
+  quizSessionId String? @unique
+  quizSession QuizSession? @relation(fields: [quizSessionId], references: [id], onDelete: SetNull)
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([competitionId, userId])
 }
