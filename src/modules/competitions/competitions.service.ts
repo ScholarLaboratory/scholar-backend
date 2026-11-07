@@ -10,7 +10,7 @@ export class CompetitionsService {
     return this.prisma.competition.findMany({
       where: {
         OR: [
-          { status: { in: ['OPEN', 'CLOSED', 'STARTED'] } },
+          { status: { in: ['OPEN', 'CLOSED'] } },
           { facilitatorId: userId },
         ],
       },
