@@ -517,6 +517,19 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       .send({ opponentId: opponent.id, topicId, questionCount: 2, durationSeconds: 30 })
       .expect(201);
     const id = created.body.id as string;
+    const outsider = await register(11);
+    const challengerHistory = await request(app.getHttpServer())
+      .get('/api/v1/challenges/mine')
+      .auth(challenger.token, { type: 'bearer' }).expect(200);
+    const opponentHistory = await request(app.getHttpServer())
+      .get('/api/v1/challenges/mine')
+      .auth(opponent.token, { type: 'bearer' }).expect(200);
+    const outsiderHistory = await request(app.getHttpServer())
+      .get('/api/v1/challenges/mine')
+      .auth(outsider.token, { type: 'bearer' }).expect(200);
+    expect(challengerHistory.body).toContainEqual(expect.objectContaining({ id }));
+    expect(opponentHistory.body).toContainEqual(expect.objectContaining({ id }));
+    expect(outsiderHistory.body).not.toContainEqual(expect.objectContaining({ id }));
     await request(app.getHttpServer())
       .post(`/api/v1/challenges/${id}/decline`)
       .auth(challenger.token, { type: 'bearer' }).expect(403);
