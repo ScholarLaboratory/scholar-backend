@@ -436,6 +436,18 @@ describe('Competition flow (PostgreSQL e2e)', () => {
     expect(assignedSessions.challengerQuizId).toBeTruthy();
     expect(assignedSessions.opponentQuizId).toBeTruthy();
     expect(assignedSessions.challengerQuizId).not.toBe(assignedSessions.opponentQuizId);
+    const challengerQuestions = await prisma.quizSessionQuestion.findMany({
+      where: { sessionId: assignedSessions.challengerQuizId! },
+      orderBy: { position: 'asc' },
+      select: { questionId: true },
+    });
+    const opponentQuestions = await prisma.quizSessionQuestion.findMany({
+      where: { sessionId: assignedSessions.opponentQuizId! },
+      orderBy: { position: 'asc' },
+      select: { questionId: true },
+    });
+    expect(challengerQuestions).toHaveLength(2);
+    expect(opponentQuestions).toEqual(challengerQuestions);
     const [challengerReady, opponentReady] = await Promise.all([
       request(app.getHttpServer())
         .post(`/api/v1/challenges/${challengeId}/ready`)
