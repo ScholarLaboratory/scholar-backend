@@ -6,6 +6,26 @@ import { CreateCompetitionDto } from './dto/create-competition.dto';
 export class CompetitionsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async listDiscoverable(userId: string) {
+    return this.prisma.competition.findMany({
+      where: {
+        OR: [
+          { status: { in: ['OPEN', 'CLOSED', 'STARTED'] } },
+          { facilitatorId: userId },
+        ],
+      },
+      select: {
+        id: true, title: true, status: true, questionCount: true,
+        durationSeconds: true, scheduledAt: true, startsAt: true,
+        facilitator: { select: { fullName: true, username: true } },
+        topic: { select: { name: true, subject: { select: { name: true } } } },
+        _count: { select: { participants: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+  }
+
   async create(facilitatorId: string, dto: CreateCompetitionDto) {
     const organizer = await this.prisma.user.findUnique({ where: { id: facilitatorId }, select: { role: true } });
     if (!organizer || !['FACILITATOR', 'ADMIN'].includes(organizer.role)) {
