@@ -11,6 +11,12 @@ import { CompetitionsService } from './competitions.service';
 export class CompetitionsController {
   constructor(private readonly service: CompetitionsService) {}
 
+  @Get()
+  @ApiOperation({ summary: 'List discoverable hosted competitions' })
+  list(@Req() req: { user: { id: string } }) {
+    return this.service.listDiscoverable(req.user.id);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Create a facilitator-hosted competition draft' })
   create(@Req() req: { user: { id: string } }, @Body() dto: CreateCompetitionDto) {
