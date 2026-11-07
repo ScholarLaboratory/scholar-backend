@@ -508,4 +508,34 @@ describe('Competition flow (PostgreSQL e2e)', () => {
     expect(finalized.body).toMatchObject({ status: 'COMPLETED', winnerId: challenger.id });
   });
 
+  it('keeps declined 1v1 invitations terminal and creates no quizzes', async () => {
+    const challenger = await register(9);
+    const opponent = await register(10);
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/challenges')
+      .auth(challenger.token, { type: 'bearer' })
+      .send({ opponentId: opponent.id, topicId, questionCount: 2, durationSeconds: 30 })
+      .expect(201);
+    const id = created.body.id as string;
+    await request(app.getHttpServer())
+      .post(`/api/v1/challenges/${id}/decline`)
+      .auth(challenger.token, { type: 'bearer' }).expect(403);
+    await request(app.getHttpServer())
+      .post(`/api/v1/challenges/${id}/decline`)
+      .auth(opponent.token, { type: 'bearer' }).expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/challenges/${id}/decline`)
+      .auth(opponent.token, { type: 'bearer' }).expect(409);
+    await request(app.getHttpServer())
+      .post(`/api/v1/challenges/${id}/accept`)
+      .auth(opponent.token, { type: 'bearer' }).expect(409);
+    await request(app.getHttpServer())
+      .post(`/api/v1/challenges/${id}/ready`)
+      .auth(challenger.token, { type: 'bearer' }).expect(409);
+    const declined = await prisma.challenge.findUniqueOrThrow({ where: { id } });
+    expect(declined).toMatchObject({
+      status: 'DECLINED', challengerQuizId: null, opponentQuizId: null,
+    });
+  });
+
 });
