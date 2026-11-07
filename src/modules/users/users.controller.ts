@@ -9,6 +9,7 @@ import {
   Post,
   Delete,
   NotFoundException,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
@@ -22,6 +23,14 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
   ) {}
+
+  @Get('search')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Search students by name or username for challenges' })
+  searchStudents(@Req() req: { user: { id: string } }, @Query('q') q = '') {
+    return this.usersService.searchStudents(req.user.id, q);
+  }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
