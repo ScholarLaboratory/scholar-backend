@@ -409,6 +409,15 @@ describe('Competition flow (PostgreSQL e2e)', () => {
       .send({ opponentId: opponent.id, topicId, questionCount: 2, durationSeconds: 30 })
       .expect(201);
     const challengeId = created.body.id as string;
+    const outsider = await register(8);
+    await request(app.getHttpServer())
+      .get(`/api/v1/challenges/${challengeId}`)
+      .auth(outsider.token, { type: 'bearer' }).expect(403);
+    for (const action of ['accept', 'decline', 'ready', 'finalize']) {
+      await request(app.getHttpServer())
+        .post(`/api/v1/challenges/${challengeId}/${action}`)
+        .auth(outsider.token, { type: 'bearer' }).expect(403);
+    }
     await request(app.getHttpServer())
       .post(`/api/v1/challenges/${challengeId}/accept`)
       .auth(opponent.token, { type: 'bearer' }).expect(201);
