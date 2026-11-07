@@ -412,13 +412,27 @@ describe('Competition flow (PostgreSQL e2e)', () => {
     await request(app.getHttpServer())
       .post(`/api/v1/challenges/${challengeId}/accept`)
       .auth(opponent.token, { type: 'bearer' }).expect(201);
-    await request(app.getHttpServer())
+    const [challengerReady, opponentReady] = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/api/v1/challenges/${challengeId}/ready`)
+        .auth(challenger.token, { type: 'bearer' }),
+      request(app.getHttpServer())
+        .post(`/api/v1/challenges/${challengeId}/ready`)
+        .auth(opponent.token, { type: 'bearer' }),
+    ]);
+    expect(challengerReady.status).toBe(201);
+    expect(opponentReady.status).toBe(201);
+    const readyAgain = await request(app.getHttpServer())
       .post(`/api/v1/challenges/${challengeId}/ready`)
       .auth(challenger.token, { type: 'bearer' }).expect(201);
-    await request(app.getHttpServer())
-      .post(`/api/v1/challenges/${challengeId}/ready`)
-      .auth(opponent.token, { type: 'bearer' }).expect(201);
+    expect(readyAgain.body.status).toBe('STARTED');
     const challenge = await prisma.challenge.findUniqueOrThrow({ where: { id: challengeId } });
+    expect(challenge.startsAt).not.toBeNull();
+    expect(challenge.endsAt).not.toBeNull();
+    expect(new Date(challenge.endsAt!).getTime() - new Date(challenge.startsAt!).getTime())
+      .toBe(30000);
+    expect(new Date(readyAgain.body.startsAt).getTime())
+      .toBe(new Date(challenge.startsAt!).getTime());
     const challengerQuizId = challenge.challengerQuizId!;
     const opponentQuizId = challenge.opponentQuizId!;
     const assigned = await prisma.quizSessionQuestion.findFirstOrThrow({
