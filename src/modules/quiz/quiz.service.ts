@@ -110,8 +110,19 @@ export class QuizService {
     if (session.status === QuizSessionStatus.IN_PROGRESS) {
       await this.assertChallengeWindow(this.prisma, sessionId);
     }
+    const [challengeWindow, competitionWindow] = await Promise.all([
+      this.prisma.challenge.findFirst({
+        where: { OR: [{ challengerQuizId: sessionId }, { opponentQuizId: sessionId }] },
+        select: { endsAt: true },
+      }),
+      this.prisma.competitionParticipant.findUnique({
+        where: { quizSessionId: sessionId },
+        select: { competition: { select: { endsAt: true } } },
+      }),
+    ]);
     return {
       id: session.id,
+      endsAt: challengeWindow?.endsAt ?? competitionWindow?.competition.endsAt ?? null,
       status: session.status,
       total: session.total,
       answered: session.answers.length,
